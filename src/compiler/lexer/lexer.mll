@@ -15,6 +15,7 @@
     raise (Error err_str)
 }
 
+let whitespace = [' ' '\t' ]
 let digits = ['0' - '9']+
 let letter = ['a' - 'z' 'A' - 'Z']
 let id = letter+ (letter | digit | '_')*
@@ -23,8 +24,9 @@ let id = letter+ (letter | digit | '_')*
 
 (* an entrypoint with a few starting regexps *)
 rule token = parse
-  [' ' '\t' ]     { token lexbuf }     (* skip blanks *)
+| whitespace          { token lexbuf }     (* skip blanks *)
 | eof                 { EOF       }
+| "/*"                { comment 0 lexbuf }
 | ','                 { COMMA     }
 | ';'                 { SEMICOLON }
 | ":="                { ASSIGN    }
@@ -32,9 +34,16 @@ rule token = parse
 | "if"                { IF }
 | digits as i         { INT (int_of_string i) }
 | id as i             { ID (i) }
+| '"'                 { error lexbuf "string not impl" (* add string function *) }
+| "{"                 { error lexbuf "record brace open not impl" (* add record function *) }
 
+and comment level = parse
+| eof    { error lexbuf "File ended in comment"                           }
+| '\n'   { Lexing.new_line lexbuf ; comment level lexbuf                  }
+| "/*"   { comment (level + 1) lexbuf                                     }
+| "*/"   { if level = 0 then token lexbuf else comment (level - 1) lexbuf }
+| _      { comment level lexbuf                                           }
 
-(* add your regexps here *)
 
 (* default error handling *)
 | _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
