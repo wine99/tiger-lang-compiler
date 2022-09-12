@@ -71,7 +71,7 @@ rule token = parse
 | "nil"               { NIL                                                            }
 | digits as i         { INT (int_of_string i)                                          }
 | id as i             { ID (i)                                                         }
-| '"'                 { parse_string "\"" lexbuf                                             }
+| '"'                 { parse_string "\"" lexbuf                                       }
 | _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
 
 and comment level = parse
