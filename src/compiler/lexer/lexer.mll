@@ -24,18 +24,53 @@ let id = letter+ (letter | digit | '_')*
 
 (* an entrypoint with a few starting regexps *)
 rule token = parse
-| whitespace          { token lexbuf }     (* skip blanks *)
-| eof                 { EOF       }
-| "/*"                { comment 0 lexbuf }
-| ','                 { COMMA     }
-| ';'                 { SEMICOLON }
-| ":="                { ASSIGN    }
-| "array"             { ARRAY }
-| "if"                { IF }
-| digits as i         { INT (int_of_string i) }
-| id as i             { ID (i) }
-| '"'                 { error lexbuf "string not impl" (* add string function *) }
-| "{"                 { error lexbuf "record brace open not impl" (* add record function *) }
+| whitespace          { token lexbuf                                                   }
+| eof                 { EOF                                                            }
+| "/*"                { comment 0 lexbuf                                               }
+| '.'                 { DOT                                                            }
+| ','                 { COMMA                                                          }
+| ';'                 { SEMICOLON                                                      }
+| ":="                { ASSIGN                                                         }
+| '('                 { LPAREN                                                         }
+| ')'                 { RPAREN                                                         }
+| '{'                 { LBRACE                                                         }
+| '}'                 { RBRACE                                                         }
+| '['                 { LBRACKET                                                       }
+| ']'                 { RBRACKET                                                       }
+| ':'                 { COLON                                                          }
+| '+'                 { PLUS                                                           }
+| '-'                 { MINUS                                                          }
+| '*'                 { TIMES                                                          }
+| '/'                 { DIV                                                            }
+| '='                 { EQ                                                             }
+| "<>"                { NEQ                                                            }
+| '<'                 { LT                                                             }
+| "<="                { LEQ                                                            }
+| '>'                 { GT                                                             }
+| ">="                { GEQ                                                            }
+| '&'                 { AMPERSAND                                                      }
+| '|'                 { PIPE                                                           }
+| "array"             { ARRAY                                                          }
+| "if"                { IF                                                             }
+| "while"             { WHILE                                                          }
+| "for"               { FOR                                                            }
+| "to"                { TO                                                             }
+| "break"             { BREAK                                                          }
+| "let"               { LET                                                            }
+| "in"                { IN                                                             }
+| "end"               { END                                                            }
+| "function"          { FUNCTION                                                       }
+| "var"               { VAR                                                            }
+| "type"              { TYPE                                                           }
+| "then"              { THEN                                                           }
+| "else"              { ELSE                                                           }
+| "do"                { DO                                                             }
+| "of"                { OF                                                             }
+| "nil"               { NIL                                                            }
+| digits as i         { INT (int_of_string i)                                          }
+| id as i             { ID (i)                                                         }
+| '"'                 { error lexbuf "string not impl" (* add string function *)       }
+| _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
 
 and comment level = parse
 | eof    { error lexbuf "File ended in comment"                           }
@@ -44,6 +79,3 @@ and comment level = parse
 | "*/"   { if level = 0 then token lexbuf else comment (level - 1) lexbuf }
 | _      { comment level lexbuf                                           }
 
-
-(* default error handling *)
-| _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
