@@ -20,7 +20,7 @@ let digits = ['0' - '9']+
 let letter = ['a' - 'z' 'A' - 'Z']
 let id = letter+ (letter | digits | '_')*
 
-(* an entrypoint with a few starting regexps *)
+(** The main entrypoint for the lexer *)
 rule token = parse
 | whitespace          { token lexbuf                                                   }
 | '\n'                { Lexing.new_line lexbuf ; token lexbuf                          }
