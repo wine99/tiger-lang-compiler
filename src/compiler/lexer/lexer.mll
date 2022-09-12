@@ -26,6 +26,7 @@ let id = letter+ (letter | digits | '_')*
 rule token = parse
 | whitespace          { token lexbuf                                                   }
 | '\n'                { Lexing.new_line lexbuf ; token lexbuf                          }
+| "\r\n"              { Lexing.new_line lexbuf ; token lexbuf                          }
 | eof                 { EOF                                                            }
 | "/*"                { comment 0 lexbuf                                               }
 | '.'                 { DOT                                                            }
