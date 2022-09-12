@@ -18,7 +18,7 @@
 let whitespace = [' ' '\t' ]
 let digits = ['0' - '9']+
 let letter = ['a' - 'z' 'A' - 'Z']
-let id = letter+ (letter | digit | '_')*
+let id = letter+ (letter | digits | '_')*
 
 (* add more named regexps here *)
 
@@ -69,7 +69,7 @@ rule token = parse
 | "nil"               { NIL                                                            }
 | digits as i         { INT (int_of_string i)                                          }
 | id as i             { ID (i)                                                         }
-| '"'                 { error lexbuf "string not impl" (* add string function *)       }
+| '"'                 { string "\"" lexbuf                                             }
 | _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
 
 and comment level = parse
@@ -79,3 +79,17 @@ and comment level = parse
 | "*/"   { if level = 0 then token lexbuf else comment (level - 1) lexbuf }
 | _      { comment level lexbuf                                           }
 
+and string acc = parse
+| '\'  { let esc = escape_character lexbuf in string (acc ^ esc) } 
+| '"'  { STRING (acc ^ "\"")                                     }
+| eof  { error lexbuf "Unclosed string"                          }
+| c    { string (acc ^ c)                                        }
+
+and escape = parse
+| '\' { "\\" }
+| 'n' { "\n" }
+| 't' { "\t" }
+| 'r' { "\r" }
+| '"' { "\"" }
+| 'b' { "\b" }
+| c   { error lexbuf "Invalid escape character" }
