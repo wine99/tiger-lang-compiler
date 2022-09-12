@@ -35,21 +35,21 @@ rule token = parse
 | ')'                 { RPAREN                                                         }
 | '{'                 { LBRACE                                                         }
 | '}'                 { RBRACE                                                         }
-| '['                 { LBRACKET                                                       }
-| ']'                 { RBRACKET                                                       }
+| '['                 { LBRACK                                                         }
+| ']'                 { RBRACK                                                         }
 | ':'                 { COLON                                                          }
 | '+'                 { PLUS                                                           }
 | '-'                 { MINUS                                                          }
 | '*'                 { TIMES                                                          }
-| '/'                 { DIV                                                            }
+| '/'                 { DIVIDE                                                         }
 | '='                 { EQ                                                             }
 | "<>"                { NEQ                                                            }
 | '<'                 { LT                                                             }
-| "<="                { LEQ                                                            }
+| "<="                { LE                                                             }
 | '>'                 { GT                                                             }
-| ">="                { GEQ                                                            }
-| '&'                 { AMPERSAND                                                      }
-| '|'                 { PIPE                                                           }
+| ">="                { GE                                                             }
+| '&'                 { AND                                                            }
+| '|'                 { OR                                                             }
 | "array"             { ARRAY                                                          }
 | "if"                { IF                                                             }
 | "while"             { WHILE                                                          }
@@ -80,16 +80,16 @@ and comment level = parse
 | _      { comment level lexbuf                                           }
 
 and string acc = parse
-| '\'  { let esc = escape_character lexbuf in string (acc ^ esc) } 
-| '"'  { STRING (acc ^ "\"")                                     }
-| eof  { error lexbuf "Unclosed string"                          }
-| c    { string (acc ^ c)                                        }
+| '\\'   { let esc = escape_character lexbuf in string (acc ^ esc) lexbuf } 
+| '"'    { STRING (acc ^ "\"")                                            }
+| eof    { error lexbuf "Unclosed string"                                 }
+| _ as c { string (acc ^ (String.make 1 c)) lexbuf                        }
 
-and escape = parse
-| '\' { "\\" }
-| 'n' { "\n" }
-| 't' { "\t" }
-| 'r' { "\r" }
-| '"' { "\"" }
-| 'b' { "\b" }
-| c   { error lexbuf "Invalid escape character" }
+and escape_character = parse
+| '\\' { "\\" }
+| 'n'  { "\n" }
+| 't'  { "\t" }
+| 'r'  { "\r" }
+| '"'  { "\"" }
+| 'b'  { "\b" }
+| _    { error lexbuf "Invalid escape character" }
