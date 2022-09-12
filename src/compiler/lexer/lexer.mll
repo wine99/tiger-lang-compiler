@@ -20,8 +20,6 @@ let digits = ['0' - '9']+
 let letter = ['a' - 'z' 'A' - 'Z']
 let id = letter+ (letter | digits | '_')*
 
-(* add more named regexps here *)
-
 (* an entrypoint with a few starting regexps *)
 rule token = parse
 | whitespace          { token lexbuf                                                   }
