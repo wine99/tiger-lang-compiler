@@ -15,20 +15,24 @@
     raise (Error err_str)
 }
 
-let digits=['0'-'9']+
+let digits = ['0' - '9']+
+let letter = ['a' - 'z' 'A' - 'Z']
+let id = letter+ (letter | digit | '_')*
 
 (* add more named regexps here *)
 
 (* an entrypoint with a few starting regexps *)
 rule token = parse
   [' ' '\t' ]     { token lexbuf }     (* skip blanks *)
-| eof                 { EOF }
-| ','                 { COMMA }
+| eof                 { EOF       }
+| ','                 { COMMA     }
 | ';'                 { SEMICOLON }
-| ":="                { ASSIGN }
+| ":="                { ASSIGN    }
 | "array"             { ARRAY }
 | "if"                { IF }
 | digits as i         { INT (int_of_string i) }
+| id as i             { ID (i) }
+
 
 (* add your regexps here *)
 
