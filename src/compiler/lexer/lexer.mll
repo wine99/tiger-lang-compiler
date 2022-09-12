@@ -67,8 +67,8 @@ rule token = parse
 | "do"                { DO                                                             }
 | "of"                { OF                                                             }
 | "nil"               { NIL                                                            }
-| digits as i         { INT (int_of_string i)                                          }
-| id as i             { ID (i)                                                         }
+| digits              { INT (int_of_string (Lexing.lexeme lexbuf))                     }
+| id                  { ID (Lexing.lexeme lexbuf)                                      }
 | '"'                 { lex_string "" lexbuf                                           }
 | _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
 
@@ -83,7 +83,7 @@ and lex_string acc = parse
 | '\\'   { let esc = escape_character lexbuf in lex_string (acc ^ esc) lexbuf   } 
 | '"'    { STRING acc                                                           }
 | eof    { error lexbuf "Unclosed string"                                       }
-| _ as c { lex_string (acc ^ (String.make 1 c)) lexbuf                          }
+| _      { lex_string (acc ^ (Lexing.lexeme lexbuf)) lexbuf                     }
 
 and escape_character = parse
 | '\\' { "\\" }
