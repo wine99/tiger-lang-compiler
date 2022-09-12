@@ -15,7 +15,7 @@
     raise (Error err_str)
 }
 
-let whitespace = [' ' '\t' ]
+let whitespace = [' ' '\t']
 let digits = ['0' - '9']+
 let letter = ['a' - 'z' 'A' - 'Z']
 let id = letter+ (letter | digits | '_')*
@@ -25,6 +25,7 @@ let id = letter+ (letter | digits | '_')*
 (* an entrypoint with a few starting regexps *)
 rule token = parse
 | whitespace          { token lexbuf                                                   }
+| '\n'                { Lexing.new_line lexbuf ; token lexbuf                          }
 | eof                 { EOF                                                            }
 | "/*"                { comment 0 lexbuf                                               }
 | '.'                 { DOT                                                            }
