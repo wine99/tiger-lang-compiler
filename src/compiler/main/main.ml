@@ -4,15 +4,17 @@
 
 (** Tigerc compiler main *)
 
-
 open Tigerlexer
 open Tigerparser
-
 open Phases
 open ExitCodes
 
-
-type config = {file: string; phase: phase; norm_cnd: phase_relation; unfold: int; out: Format.formatter}
+type config =
+  { file: string
+  ; phase: phase
+  ; norm_cnd: phase_relation
+  ; unfold: int
+  ; out: Format.formatter }
 
 exception ExitMain of phase
 
@@ -23,7 +25,7 @@ let initLexer filename =
   let input = open_in filename in
   let filebuf = Lexing.from_channel input in
   (* obs that we need to initialize the pos_fname field ourselves *)
-  filebuf.lex_curr_p <- { filebuf.lex_curr_p with pos_fname = filename };
+  filebuf.lex_curr_p <- {filebuf.lex_curr_p with pos_fname= filename} ;
   (input, filebuf)
 
 let lexonly file out =
@@ -31,44 +33,35 @@ let lexonly file out =
   let lexRes =
     try
       let tokens = Parser.lexdriver Lexer.token filebuf in
-      let printToken ((t,p):string * Lexing.position) =
-        Format.fprintf out "%d:%d:%s\n"
-          p.pos_lnum (p.pos_cnum - p.pos_bol + 1) t
+      let printToken ((t, p) : string * Lexing.position) =
+        Format.fprintf out "%d:%d:%s\n" p.pos_lnum
+          (p.pos_cnum - p.pos_bol + 1)
+          t
       in
       List.iter printToken tokens
-    with
-    | Lexer.Error msg ->
-      Printf.eprintf "%s%!" msg;
-      raise (ExitMain LEX)
+    with Lexer.Error msg -> Printf.eprintf "%s%!" msg ; raise (ExitMain LEX)
   in
-  close_in input; lexRes
-
+  close_in input ; lexRes
 
 (* Our reference compiler should allow for stopping at different phases
    in the compilation and allow us to pick the right backend. We implement
    this using a straightforward command-line parsing/checking *)
 
-
 (* --- command-line checking; dispatching to the right phase --- *)
 
 (* observe that we make sure that exit flags are raised upon
    invalid return from each phase *)
-let withFlags {file;phase;out;_} =
+let withFlags {file; phase; out; _} =
   let exitCode = ref 0 in
-  
-  
-  begin
-    try
+  ( try
       match phase with
-      | LEX ->
-        lexonly file out
+      | LEX -> lexonly file out
       | _ -> failwith "Phase not implemented"
-    with
-      ExitMain p -> exitCode := (error_code p)
-  end;
-  Format.pp_print_flush out ();
-  flush_all();
-  exit (!exitCode) (* obs: exits the program *)
+    with ExitMain p -> exitCode := error_code p ) ;
+  Format.pp_print_flush out () ;
+  flush_all () ;
+  exit !exitCode
+(* obs: exits the program *)
 
 (* --- program entry point: prep work wrt command line args --- *)
 
@@ -80,40 +73,51 @@ let src_arg =
 
 let dst_arg =
   let doc = "Output to $(docv)." in
-  Arg.(value & opt (some string) None & info ["o";"out"] ~docv:"FILE" ~doc)
+  Arg.(value & opt (some string) None & info ["o"; "out"] ~docv:"FILE" ~doc)
 
-type norm_cnd =
-  | NONE | PREVIOUS | ALL
+type norm_cnd = NONE | PREVIOUS | ALL
+
 let norm_arg =
   let ls = [("none", NONE); ("previous", PREVIOUS); ("all", ALL)] in
   let doc = "Select $(docv) phases to normalize." in
-  Arg.(value & opt (enum ls) PREVIOUS & info ["n";"normalize"] ~docv:"WHICH" ~doc)
+  Arg.(
+    value
+    & opt (enum ls) PREVIOUS
+    & info ["n"; "normalize"] ~docv:"WHICH" ~doc)
 
 let phase_arg =
-  let ls = [("lex", LEX); ("par", PAR); ("sem", SEM); ("hoist", HOIST); ("js", JS); ("llvm", LLVM); ("x86", X86)] in
+  let ls =
+    [ ("lex", LEX)
+    ; ("par", PAR)
+    ; ("sem", SEM)
+    ; ("hoist", HOIST)
+    ; ("js", JS)
+    ; ("llvm", LLVM)
+    ; ("x86", X86) ]
+  in
   let doc = "Only compile to $(docv)." in
-  Arg.(value & opt (enum ls) LEX & info ["p";"phase"] ~docv:"PHASE" ~doc)
+  Arg.(value & opt (enum ls) LEX & info ["p"; "phase"] ~docv:"PHASE" ~doc)
 
 let unfold_arg =
   let doc = "Unfold name-types $(docv) levels when pretty-printing." in
-  Arg.(value & opt int 0 & info ["u";"unfold"] ~docv:"N" ~doc)
+  Arg.(value & opt int 0 & info ["u"; "unfold"] ~docv:"N" ~doc)
 
 let check file out_opt phase norm unfold =
   let out =
     match out_opt with
     | None -> Format.std_formatter
-    | Some s -> Format.formatter_of_out_channel (Stdio.Out_channel.create s) in
-
+    | Some s -> Format.formatter_of_out_channel (Stdio.Out_channel.create s)
+  in
   let norm_cnd =
     match norm with
-    | NONE -> (fun _ _ -> false)
+    | NONE -> fun _ _ -> false
     | PREVIOUS -> isBefore
-    | ALL -> (fun _ _ -> true) in
-
-  if unfold < 0
-  then (Printf.eprintf "Unfold argument must be non-negative.\n%!"; exit 1);
-
-  let config = {file;out;phase;norm_cnd;unfold} in
+    | ALL -> fun _ _ -> true
+  in
+  if unfold < 0 then (
+    Printf.eprintf "Unfold argument must be non-negative.\n%!" ;
+    exit 1 ) ;
+  let config = {file; out; phase; norm_cnd; unfold} in
   withFlags config
 
 let main_t =
