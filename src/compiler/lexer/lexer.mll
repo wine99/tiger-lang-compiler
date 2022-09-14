@@ -5,7 +5,7 @@
 (**************************************************************************)
 
 {
-  open Tigerparser.Parser  
+  open Tigerparser.Parser
   exception Error of string
   let error lexbuf msg =
     let position = Lexing.lexeme_start_p lexbuf in
@@ -83,11 +83,10 @@ and comment level = parse
 | _      { comment level lexbuf                                           }
 
 and str start_pos acc = parse
-| '\\'   { let esc = escape_character lexbuf in str start_pos (acc ^ esc) lexbuf } 
+| '\\'   { let esc = escape_character lexbuf in str start_pos (acc ^ esc) lexbuf }
 | '"'    { lexbuf.lex_start_p <- start_pos ; STRING acc                          }
 | eof    { error lexbuf "Unclosed string"                                        }
 | _      { str start_pos (acc ^ (Lexing.lexeme lexbuf)) lexbuf                   }
-
 
 
 and escape_character = parse
@@ -97,17 +96,4 @@ and escape_character = parse
 | 'r'    { "\r" }
 | '"'    { "\"" }
 | 'b'    { "\b" }
-<<<<<<< HEAD
-<<<<<<< HEAD
 | _    { error lexbuf "Invalid escape character" }
-=======
-=======
->>>>>>> Start on ascii support
-| ascii_sign    { "\027" }
-| ascii_digit { translate_to_ascii (Lexing.lexeme lexbuf ) }
-| _    { error lexbuf "Invalid escape character" }
-
-<<<<<<< HEAD
->>>>>>> Start on ascii support
-=======
->>>>>>> Start on ascii support
