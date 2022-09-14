@@ -1,7 +1,23 @@
-[**.{ml, mll, mli, mly}]
+root = true
+
+[**]
 indent_style = space
 indent_size = 2
 end_of_line = lf
+
+[**.{ml,ml[ily],gitignore,gitattributes,editorconfig,md,sh,ocamlformat, opam, opam.locked}]
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
+
+[{**dune, dune-project}]
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[**.json]
+indent_size = 4
+
+[Makefile]
+indent_size = 4
+indent_style = tab
