@@ -19,6 +19,9 @@ let whitespace = [' ' '\t']
 let digits = ['0' - '9']+
 let letter = ['a' - 'z' 'A' - 'Z']
 let id = letter+ (letter | digits | '_')*
+let ascii_digit = ['0' - '9']['0' - '9']['0' - '9']
+let ascii_sign = "^["
+let translate_to_ascii i = i
 
 (** The main entrypoint for the lexer *)
 rule token = parse
@@ -85,6 +88,7 @@ and lex_string acc = parse
 | eof    { error lexbuf "Unclosed string"                                       }
 | _      { lex_string (acc ^ (Lexing.lexeme lexbuf)) lexbuf                     }
 
+
 and escape_character = parse
 | '\\'   { "\\" }
 | 'n'    { "\n" }
@@ -92,4 +96,7 @@ and escape_character = parse
 | 'r'    { "\r" }
 | '"'    { "\"" }
 | 'b'    { "\b" }
+| ascii_sign    { "\027" }
+| ascii_digit { translate_to_ascii (Lexing.lexeme lexbuf ) }
 | _    { error lexbuf "Invalid escape character" }
+
