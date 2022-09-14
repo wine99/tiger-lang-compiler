@@ -81,8 +81,8 @@ and comment level = parse
 
 and str start_pos acc = parse
 | '\\'   { let esc = escape_character lexbuf in str start_pos (acc ^ esc) lexbuf } 
-| '"'    { lexbuf.lex_start_p <- start_pos ; STRING acc                                 }
-| eof    { error lexbuf "Unclosed string"                                               }
+| '"'    { lexbuf.lex_start_p <- start_pos ; STRING acc                          }
+| eof    { error lexbuf "Unclosed string"                                        }
 | _      { str start_pos (acc ^ (Lexing.lexeme lexbuf)) lexbuf                   }
 
 and escape_character = parse
