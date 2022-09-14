@@ -69,7 +69,7 @@ rule token = parse
 | "nil"               { NIL                                                            }
 | digits              { INT (int_of_string (Lexing.lexeme lexbuf))                     }
 | id                  { ID (Lexing.lexeme lexbuf)                                      }
-| '"'                 { let pos = Lexing.lexeme_start_p lexbuf in let lexeme = lex_string "" lexbuf in lexbuf.lex_start_p <- pos ; lexeme }
+| '"'                 { str (Lexing.lexeme_start_p lexbuf) "" lexbuf                   }
 | _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
 
 and comment level = parse
@@ -79,11 +79,11 @@ and comment level = parse
 | "*/"   { if level = 0 then token lexbuf else comment (level - 1) lexbuf }
 | _      { comment level lexbuf                                           }
 
-and lex_string acc = parse
-| '\\'   { let esc = escape_character lexbuf in lex_string (acc ^ esc) lexbuf   } 
-| '"'    { STRING acc                                                           }
-| eof    { error lexbuf "Unclosed string"                                       }
-| _      { lex_string (acc ^ (Lexing.lexeme lexbuf)) lexbuf                     }
+and str start_pos acc = parse
+| '\\'   { let esc = escape_character lexbuf in str start_pos (acc ^ esc) lexbuf } 
+| '"'    { lexbuf.lex_start_p <- start_pos ; STRING acc                                 }
+| eof    { error lexbuf "Unclosed string"                                               }
+| _      { str start_pos (acc ^ (Lexing.lexeme lexbuf)) lexbuf                   }
 
 and escape_character = parse
 | '\\'   { "\\" }
@@ -92,4 +92,5 @@ and escape_character = parse
 | 'r'    { "\r" }
 | '"'    { "\"" }
 | 'b'    { "\b" }
+| digits { }
 | _    { error lexbuf "Invalid escape character" }
