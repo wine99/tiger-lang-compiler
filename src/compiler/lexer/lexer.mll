@@ -4,6 +4,7 @@
 (* Do not distribute                                                      *)
 (**************************************************************************)
 
+
 {
   open Tigerparser.Parser
   exception Error of string
@@ -13,15 +14,19 @@
                   position.pos_fname position.pos_lnum (position.pos_cnum - position.pos_bol + 1)
                   ^ msg ^ "\n" in
     raise (Error err_str)
+
 }
+
+
 
 let whitespace = [' ' '\t']
 let digits = ['0' - '9']+
-let letter = ['a' - 'z' 'A' - 'Z']
+let small_letters = ['a' - 'z']
+let big_letters = ['A' - 'Z']
+let letter = small_letters | big_letters
 let id = letter+ (letter | digits | '_')*
 let ascii_digit = ['0' - '9']['0' - '9']['0' - '9']
-let ascii_sign = "^["
-let translate_to_ascii i = i
+let caret_notation = '^' big_letters
 
 (** The main entrypoint for the lexer *)
 rule token = parse
@@ -97,7 +102,8 @@ and escape_character = parse
 | 'r'    { "\r" }
 | '"'    { "\"" }
 | 'b'    { "\b" }
-| ascii_sign    { "\027" }
-| ascii_digit { translate_to_ascii (Lexing.lexeme lexbuf ) }
+| "^["   { "\027" }
+| caret_notation    { "\027" }
+| ascii_digit { String.make 1 (Char.chr (int_of_string(Lexing.lexeme lexbuf))) }
 | _    { error lexbuf "Invalid escape character" }
 
