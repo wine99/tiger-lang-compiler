@@ -92,5 +92,4 @@ and escape_character = parse
 | 'r'    { "\r" }
 | '"'    { "\"" }
 | 'b'    { "\b" }
-| digits { }
 | _    { error lexbuf "Invalid escape character" }
