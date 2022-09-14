@@ -69,7 +69,7 @@ rule token = parse
 | "nil"               { NIL                                                            }
 | digits              { INT (int_of_string (Lexing.lexeme lexbuf))                     }
 | id                  { ID (Lexing.lexeme lexbuf)                                      }
-| '"'                 { lex_string "" lexbuf                                           }
+| '"'                 { let pos = Lexing.lexeme_start_p lexbuf in let lexeme = lex_string "" lexbuf in lexbuf.lex_start_p <- pos ; lexeme }
 | _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
 
 and comment level = parse
@@ -86,10 +86,10 @@ and lex_string acc = parse
 | _      { lex_string (acc ^ (Lexing.lexeme lexbuf)) lexbuf                     }
 
 and escape_character = parse
-| '\\' { "\\" }
-| 'n'  { "\n" }
-| 't'  { "\t" }
-| 'r'  { "\r" }
-| '"'  { "\"" }
-| 'b'  { "\b" }
+| '\\'   { "\\" }
+| 'n'    { "\n" }
+| 't'    { "\t" }
+| 'r'    { "\r" }
+| '"'    { "\"" }
+| 'b'    { "\b" }
 | _    { error lexbuf "Invalid escape character" }
