@@ -89,6 +89,7 @@ and str start_pos acc = parse
 | _      { str start_pos (acc ^ (Lexing.lexeme lexbuf)) lexbuf                   }
 
 
+
 and escape_character = parse
 | '\\'   { "\\" }
 | 'n'    { "\n" }
@@ -97,10 +98,16 @@ and escape_character = parse
 | '"'    { "\"" }
 | 'b'    { "\b" }
 <<<<<<< HEAD
+<<<<<<< HEAD
 | _    { error lexbuf "Invalid escape character" }
 =======
+=======
+>>>>>>> Start on ascii support
 | ascii_sign    { "\027" }
 | ascii_digit { translate_to_ascii (Lexing.lexeme lexbuf ) }
 | _    { error lexbuf "Invalid escape character" }
 
+<<<<<<< HEAD
+>>>>>>> Start on ascii support
+=======
 >>>>>>> Start on ascii support
