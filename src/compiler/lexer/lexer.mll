@@ -46,7 +46,6 @@ let letter = small_letters | big_letters
 let id = letter+ (letter | digits | '_')*
 let ascii_digit = ['0' - '9']['0' - '9']['0' - '9']
 let caret_letters = ['a' - 'g'] | ['k' - 'l'] | ['n' - 'z']
-let back_seq = (' '|'\b'|'\t'|'\n'|'\r')(' '|'\b'|'\t'|'\n'|'\r')* '\\'
 
 (** The main entrypoint for the lexer *)
 rule token = parse
@@ -118,12 +117,11 @@ and str start_pos acc = parse
 
 and escape_character = parse
 | eof            { error lexbuf "Reached end of file in ecsape character." }
-| back_seq       { "" }
 | ' '
 | '\b'
 | '\t'
-| '\n'
-| '\r'           { ""   } (* ignore whitespace in string *)
+| '\r'           { back_seq lexbuf } (* ignore whitespace in string *)
+| '\n'           { Lexing.new_line lexbuf; back_seq lexbuf }
 | '\\'           { "\\" }
 | '"'            { "\"" }
 | 'b'            { "\b" }
@@ -150,3 +148,12 @@ and caret_notation = parse
 | big_letters   as b { (Char.code (b)) - 64 }
 | caret_letters as s { (Char.code (s)) - 96 }
 | _                  { error lexbuf "Invalid escape character" }
+
+and back_seq = parse
+| eof  { error lexbuf "Reached end of file in string." }
+| '\\' { ""                                            }
+| '\n' { Lexing.new_line lexbuf ; back_seq lexbuf      }
+| ' '  { back_seq lexbuf                               }
+| '\b' { back_seq lexbuf                               }
+| '\t' { back_seq lexbuf                               }
+| '\r' { back_seq lexbuf                               }
