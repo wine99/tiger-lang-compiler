@@ -46,7 +46,7 @@ let letter = small_letters | big_letters
 let id = letter+ (letter | digits | '_')*
 let ascii_digit = ['0' - '9']['0' - '9']['0' - '9']
 let caret_letters = ['a' - 'g'] | ['k' - 'l'] | ['n' - 'z']
-let back_seq = (' ' | '\n' | '\t')(' ' | '\n' | '\t')* '\\'
+let back_seq = (' '|'\b'|'\t'|'\n'|'\r')(' '|'\b'|'\t'|'\n'|'\r')* '\\'
 let symbols = '.'|','|';'|":="|'('|')'|'{'|'}'|'['|']'|':'|'+'|'-'|'*'|'/'|'='|"<>"|'<'|"<="|'>'|">="|'&'| '|'
 let allowed_string = letter | digits | symbols
 
