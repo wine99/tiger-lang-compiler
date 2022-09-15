@@ -551,30 +551,6 @@
         ]
     },
     {
-        "file": "pos/batch/a_lisp_test.tig",
-        "feature-sets": [
-            "lex0",
-            "lex1",
-            "lex2",
-            "llvm0",
-            "llvm1",
-            "llvm2",
-            "llvm3",
-            "llvm4",
-            "par0",
-            "par1",
-            "par2",
-            "par3",
-            "sem0",
-            "sem1",
-            "sem2",
-            "sem3",
-            "xasm1",
-            "xasm2",
-            "xasm3"
-        ]
-    },
-    {
         "file": "pos/batch/binary_tree.tig",
         "feature-sets": [
             "lex0",
