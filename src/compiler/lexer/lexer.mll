@@ -81,6 +81,7 @@ rule token = parse
 | ">="                { GE                                                             }
 | '&'                 { AND                                                            }
 | '|'                 { OR                                                             }
+| '^'                 { CARET                                                          }
 | "array"             { ARRAY                                                          }
 | "if"                { IF                                                             }
 | "while"             { WHILE                                                          }
