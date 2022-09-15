@@ -27,6 +27,13 @@
     else
       error lexbuf "Number is not in the range of legal ASCII code."
 
+  let is_allowed_char acc chr lexbuf =
+    let num = Char.code chr in
+    if 0 <= num && num <= 255 then
+      acc ^ String.make 1 chr
+    else
+      error lexbuf "Illegal character"
+
 }
 
 
@@ -40,6 +47,8 @@ let id = letter+ (letter | digits | '_')*
 let ascii_digit = ['0' - '9']['0' - '9']['0' - '9']
 let caret_letters = ['a' - 'g'] | ['k' - 'l'] | ['n' - 'z']
 let back_seq = (' ' | '\n' | '\t')(' ' | '\n' | '\t')* '\\'
+let symbols = '.'|','|';'|":="|'('|')'|'{'|'}'|'['|']'|':'|'+'|'-'|'*'|'/'|'='|"<>"|'<'|"<="|'>'|">="|'&'| '|'
+let allowed_string = letter | digits | symbols
 
 
 (** The main entrypoint for the lexer *)
@@ -102,10 +111,10 @@ and comment level = parse
 | _      { comment level lexbuf                                           }
 
 and str start_pos acc = parse
-| '\\'   { let esc = escape_character lexbuf in str start_pos (acc ^ esc) lexbuf }
-| '"'    { lexbuf.lex_start_p <- start_pos ; STRING acc                          }
-| eof    { error lexbuf "Unclosed string"                                        }
-| _      { str start_pos (acc ^ (Lexing.lexeme lexbuf)) lexbuf                   }
+| '\\'   { let esc = escape_character lexbuf in str start_pos (acc ^ esc) lexbuf           }
+| '"'    { lexbuf.lex_start_p <- start_pos ; STRING acc                                    }
+| eof    { error lexbuf "Unclosed string"                                                  }
+| _      { str start_pos (is_allowed_char acc (Lexing.lexeme_char lexbuf 0) lexbuf) lexbuf }
 
 
 
