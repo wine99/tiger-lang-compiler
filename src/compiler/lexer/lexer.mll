@@ -96,16 +96,16 @@ and str start_pos acc = parse
 
 
 and escape_character = parse
-| '\\'           { "\\"   }
-| 'n'            { "\n"   }
-| 't'            { "\t"   }
-| 'r'            { "\r"   }
-| '"'            { "\""   }
-| 'b'            { "\b"   }
-| "^h"                { "\b" }
-| "^i"                { "\t" }
-| "^j"               { "\n" }
-| "^m"                { "\r" }
+| '\\'           { "\\" }
+| 'n'            { "\n" }
+| 't'            { "\t" }
+| 'r'            { "\r" }
+| '"'            { "\"" }
+| 'b'            { "\b" }
+| "^h"           { "\b" }
+| "^i"           { "\t" }
+| "^j"           { "\n" }
+| "^m"           { "\r" }
 | '^'            { String.make 1 (Char.chr (caret_notation lexbuf))               }
 | ascii_digit    { String.make 1 (Char.chr (int_of_string(Lexing.lexeme lexbuf))) }
 | _              { error lexbuf "Invalid escape character"                        }
