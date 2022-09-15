@@ -15,6 +15,18 @@
                   ^ msg ^ "\n" in
     raise (Error err_str)
 
+  let bigInt str lexbuf =
+    if String.length str > 31 then
+      error lexbuf "Integer too big for system."
+    else
+      INT (int_of_string str)
+
+  let ascii_digit_range num lexbuf =
+    if 0 <= num && num <= 255 then
+      String.make 1 (Char.chr num)
+    else
+      error lexbuf "Number is not in the range of legal ASCII code."
+
 }
 
 
@@ -75,7 +87,7 @@ rule token = parse
 | "do"                { DO                                                             }
 | "of"                { OF                                                             }
 | "nil"               { NIL                                                            }
-| digits              { INT (int_of_string (Lexing.lexeme lexbuf))                     }
+| digits              { bigInt (Lexing.lexeme lexbuf) lexbuf                           }
 | id                  { ID (Lexing.lexeme lexbuf)                                      }
 | '"'                 { str (Lexing.lexeme_start_p lexbuf) "" lexbuf                   }
 | _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
@@ -96,21 +108,28 @@ and str start_pos acc = parse
 
 
 and escape_character = parse
+| eof            { error lexbuf "Reached end of file in ecsape character." }
+| ' '
+| '\b'
+| '\t'
+| '\n'
+| '\r'           { ""   } (* ignore whitespace in string *)
 | '\\'           { "\\" }
-| 'n'            { "\n" }
-| 't'            { "\t" }
-| 'r'            { "\r" }
 | '"'            { "\"" }
 | 'b'            { "\b" }
+| 't'            { "\t" }
+| 'n'            { "\n" }
+| 'r'            { "\r" }
 | "^h"           { "\b" }
 | "^i"           { "\t" }
 | "^j"           { "\n" }
 | "^m"           { "\r" }
 | '^'            { String.make 1 (Char.chr (caret_notation lexbuf))               }
-| ascii_digit    { String.make 1 (Char.chr (int_of_string(Lexing.lexeme lexbuf))) }
+| ascii_digit    { ascii_digit_range (int_of_string(Lexing.lexeme lexbuf)) lexbuf }
 | _              { error lexbuf "Invalid escape character"                        }
 
 and caret_notation = parse
+| eof                { error lexbuf "Reached end of file in caret character." }
 | '@'                { 0   }
 | '['                { 27  }
 | '\\'               { 28  }
