@@ -781,6 +781,19 @@
         ]
     },
     {
+        "file": "pos/batch/alexer_ascii_testing.tig",
+        "feature-sets": [
+            "lex0",
+            "lex2",
+            "llvm0",
+            "par0",
+            "sem0",
+            "xasm1",
+            "xasm2",
+            "xasm3"
+        ]
+    },
+    {
         "file": "pos/batch/lexer_formfeed.tig",
         "feature-sets": [
             "lex0",
