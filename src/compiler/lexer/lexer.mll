@@ -39,6 +39,8 @@ let letter = small_letters | big_letters
 let id = letter+ (letter | digits | '_')*
 let ascii_digit = ['0' - '9']['0' - '9']['0' - '9']
 let caret_letters = ['a' - 'g'] | ['k' - 'l'] | ['n' - 'z']
+let back_seq = (' ' | '\n' | '\t')(' ' | '\n' | '\t')* '\\'
+
 
 (** The main entrypoint for the lexer *)
 rule token = parse
@@ -109,6 +111,7 @@ and str start_pos acc = parse
 
 and escape_character = parse
 | eof            { error lexbuf "Reached end of file in ecsape character." }
+| back_seq       { "" }
 | ' '
 | '\b'
 | '\t'
