@@ -47,9 +47,6 @@ let id = letter+ (letter | digits | '_')*
 let ascii_digit = ['0' - '9']['0' - '9']['0' - '9']
 let caret_letters = ['a' - 'g'] | ['k' - 'l'] | ['n' - 'z']
 let back_seq = (' '|'\b'|'\t'|'\n'|'\r')(' '|'\b'|'\t'|'\n'|'\r')* '\\'
-let symbols = '.'|','|';'|":="|'('|')'|'{'|'}'|'['|']'|':'|'+'|'-'|'*'|'/'|'='|"<>"|'<'|"<="|'>'|">="|'&'| '|'
-let allowed_string = letter | digits | symbols
-
 
 (** The main entrypoint for the lexer *)
 rule token = parse
