@@ -27,12 +27,12 @@
     else
       error lexbuf "Number is not in the range of legal ASCII code."
 
-  let is_allowed_char acc chr lexbuf =
-    let num = Char.code chr in
-    if 0 <= num && num <= 255 then
+  let printable_char acc chr lexbuf =
+    let code = Char.code chr in
+    if 32 <= code && code <= 127 then
       acc ^ String.make 1 chr
     else
-      error lexbuf "Illegal character"
+      error lexbuf "Unprintable character in string"
 
 }
 
@@ -44,6 +44,7 @@ let small_letters = ['a' - 'z']
 let big_letters = ['A' - 'Z']
 let letter = small_letters | big_letters
 let id = letter+ (letter | digits | '_')*
+let illegal_id = digits (letter | '_')+
 let ascii_digit = ['0' - '9']['0' - '9']['0' - '9']
 let caret_letters = ['a' - 'g'] | ['k' - 'l'] | ['n' - 'z']
 
@@ -96,6 +97,7 @@ rule token = parse
 | "of"                { OF                                                             }
 | "nil"               { NIL                                                            }
 | digits              { bigInt (Lexing.lexeme lexbuf) lexbuf                           }
+| illegal_id          { error lexbuf ("Invalid Identifier: " ^ Lexing.lexeme lexbuf)   }
 | id                  { ID (Lexing.lexeme lexbuf)                                      }
 | '"'                 { str (Lexing.lexeme_start_p lexbuf) "" lexbuf                   }
 | _ as t              { error lexbuf ("Invalid character '" ^ (String.make 1 t) ^ "'") }
@@ -110,8 +112,9 @@ and comment level = parse
 and str start_pos acc = parse
 | '\\'   { let esc = escape_character lexbuf in str start_pos (acc ^ esc) lexbuf           }
 | '"'    { lexbuf.lex_start_p <- start_pos ; STRING acc                                    }
+| '\n'   { error lexbuf "Unclosed string"                                                  }
 | eof    { error lexbuf "Unclosed string"                                                  }
-| _      { str start_pos (is_allowed_char acc (Lexing.lexeme_char lexbuf 0) lexbuf) lexbuf }
+| _ as c { str start_pos (printable_char acc c lexbuf) lexbuf                              }
 
 
 
@@ -157,3 +160,4 @@ and back_seq = parse
 | '\b' { back_seq lexbuf                               }
 | '\t' { back_seq lexbuf                               }
 | '\r' { back_seq lexbuf                               }
+| _    { error lexbuf "Invalid character in formfeed." }
