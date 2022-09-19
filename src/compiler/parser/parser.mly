@@ -37,9 +37,17 @@ exp_base:
 | NIL        { NilExp      }
 | i = INT    { IntExp i    }
 | s = STRING { StringExp s }
-| f = ID LPAREN args = separated_list(COMMA, exp) RPAREN { let func = symbol f in CallExp { func ; args } }
+| func = id LPAREN args = separated_list(COMMA, exp) RPAREN { CallExp { func ; args } }
 | MINUS right = exp %prec UMINUS { let left = (IntExp 0) ^! $startpos  in let oper = MinusOp in OpExp { left ; oper ; right } } (* Unary minus *)
 | left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
+| typ = id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
+
+
+record_field:
+| symbol = id EQ exp = exp { (symbol, exp) }
+
+id:
+| id = ID { symbol id }
 
 oper:
 | EQ     { EqOp       }
@@ -62,9 +70,9 @@ exp:
 
 (* Variables *)
 var_base:
-| id = ID                       { SimpleVar    (symbol id)    }
-| v = var DOT id = ID           { FieldVar     (v, symbol id) }
-| v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)         }
+| id = id                       { SimpleVar    id      }
+| v = var DOT id = id           { FieldVar     (v, id) }
+| v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)  }
 
 var:
 | v = var_base { v ^@ $startpos }
