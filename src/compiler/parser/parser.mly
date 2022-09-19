@@ -27,8 +27,8 @@
 %%
 (* Expressions *)
 exp_base:
-| v = var { v }
-| NIL  { NilExp}
+| v = var { VarExp v }
+| NIL  { NilExp }
 | i = INT  { IntExp i }
 | s = STRING { StringExp s }
 
@@ -39,10 +39,10 @@ exp:
 | e = exp_base  { e ^! $startpos }
 
 (* Variables *)
-var:
-| v = var_base { v ^! $startpos }
-
 var_base:
 | id = ID                       { SimpleVar    (symbol id)    }
 | v = var DOT id = ID           { FieldVar     (v, symbol id) }
-| v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)                }
+| v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)         }
+
+var:
+| v = var_base { v ^@ $startpos }
