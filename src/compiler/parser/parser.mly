@@ -27,9 +27,9 @@
 %%
 (* Expressions *)
 exp_base:
-| v = var { VarExp v }
-| NIL  { NilExp }
-| i = INT  { IntExp i }
+| v = var    { VarExp v    }
+| NIL        { NilExp      }
+| i = INT    { IntExp i    }
 | s = STRING { StringExp s }
 
 (* Top-level *)
