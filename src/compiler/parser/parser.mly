@@ -26,7 +26,7 @@
 %left PLUS MINUS
 %left TIMES DIVIDE
 %nonassoc UMINUS
-%left CARET
+%right CARET
 
 %start <Tigercommon.Absyn.exp> program
 (* Observe that we need to use fully qualified types for the start symbol *)
