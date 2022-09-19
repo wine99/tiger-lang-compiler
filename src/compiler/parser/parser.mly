@@ -24,6 +24,7 @@
 %nonassoc EQ NEQ LT LE GT GE
 %left PLUS MINUS
 %left TIMES DIVIDE
+%nonassoc UMINUS
 %left CARET
 
 %start <Tigercommon.Absyn.exp> program
@@ -37,7 +38,7 @@ exp_base:
 | i = INT    { IntExp i    }
 | s = STRING { StringExp s }
 | f = ID LPAREN args = separated_list(COMMA, exp) RPAREN { let func = symbol f in CallExp { func ; args } }
-| MINUS right = exp { let left = (IntExp 0) ^! $startpos  in let oper = MinusOp in OpExp { left ; oper ; right } } (* Unary minus *)
+| MINUS right = exp %prec UMINUS { let left = (IntExp 0) ^! $startpos  in let oper = MinusOp in OpExp { left ; oper ; right } } (* Unary minus *)
 | left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
 
 oper:
