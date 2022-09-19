@@ -31,6 +31,8 @@ exp_base:
 | NIL        { NilExp      }
 | i = INT    { IntExp i    }
 | s = STRING { StringExp s }
+| f = ID LPAREN args = separated_list(COMMA, exp) RPAREN {let func = symbol f in CallExp {func ; args}}
+
 
 (* Top-level *)
 program: e = exp EOF { e }
