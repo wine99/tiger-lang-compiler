@@ -20,6 +20,11 @@
 %token AND OR ASSIGN ARRAY IF THEN ELSE WHILE FOR TO DO
 %token LET IN END OF BREAK NIL FUNCTION VAR TYPE CARET
 
+(* Operator Precedence & Associativity *)
+%nonassoc EQ NEQ LT LE GT GE
+%left PLUS MINUS
+%left TIMES DIVIDE
+%left CARET
 
 %start <Tigercommon.Absyn.exp> program
 (* Observe that we need to use fully qualified types for the start symbol *)
@@ -31,8 +36,22 @@ exp_base:
 | NIL        { NilExp      }
 | i = INT    { IntExp i    }
 | s = STRING { StringExp s }
-| f = ID LPAREN args = separated_list(COMMA, exp) RPAREN {let func = symbol f in CallExp {func ; args}}
+| f = ID LPAREN args = separated_list(COMMA, exp) RPAREN { let func = symbol f in CallExp { func ; args } }
+| MINUS right = exp { let left = (IntExp 0) ^! $startpos  in let oper = MinusOp in OpExp { left ; oper ; right } } (* Unary minus *)
+| left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
 
+oper:
+| EQ     { EqOp       }
+| NEQ    { NeqOp      }
+| LT     { LtOp       }
+| LE     { LeOp       }
+| GT     { GtOp       }
+| GE     { GeOp       }
+| PLUS   { PlusOp     }
+| MINUS  { MinusOp    }
+| TIMES  { TimesOp    }
+| DIVIDE { DivideOp   }
+| CARET  { ExponentOp }
 
 (* Top-level *)
 program: e = exp EOF { e }
