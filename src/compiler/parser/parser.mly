@@ -43,6 +43,7 @@ exp_base:
 | left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
 | typ = id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
 | head = exp SEMICOLON tail = exp { SeqExp (flattenSeqExp [head ; tail]) }
+| var = var ASSIGN exp = exp { AssignExp { var ; exp } }
 
 
 record_field:
