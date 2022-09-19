@@ -1,4 +1,2 @@
 (library
-        (name tigercommon)
-        )
-
+ (name tigercommon))

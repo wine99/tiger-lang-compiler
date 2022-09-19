@@ -1,10 +1,8 @@
 (executable
-        (name runtests)
-        (libraries stdio alcotest str yojson)
-        
-        )
+ (name runtests)
+ (libraries stdio alcotest str yojson))
 
 (install
-    (section bin)    
-    (files (runtests.exe as runtests)
-           ))
+ (section bin)
+ (files
+  (runtests.exe as runtests)))

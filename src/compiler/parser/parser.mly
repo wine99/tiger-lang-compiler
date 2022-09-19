@@ -7,6 +7,7 @@
 %{
   open Tigercommon.Absyn
   open ParserAux
+  open Tigercommon.Symbol
 %}
 
 %token EOF
@@ -30,7 +31,6 @@ exp_base:
 | NIL  { NilExp}
 | i = INT  { IntExp i }
 | s = STRING { StringExp s }
-|
 
 (* Top-level *)
 program: e = exp EOF { e }
@@ -43,22 +43,6 @@ var:
 | v = var_base { v ^! $startpos }
 
 var_base:
-| id = ID                       { SimpleVar    (Symbol.symbol id)    }
-| v = var DOT id = ID           { FieldVar     (v, Symbol.symbol id) }
+| id = ID                       { SimpleVar    (symbol id)    }
+| v = var DOT id = ID           { FieldVar     (v, symbol id) }
 | v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)                }
-
-(*
-decl:
-| TYPE tpe_id = tpe_id EQ tpe { Tdecl {} }
-
-tpe:
-| tpe_id = tpe_id {}
-| LBRACE tpe_fields RBRACE {}
-| ARRAY OF tpe_id = tpe_id {}
-
-tpe_id:
-
-tpe_fields:
-id = ID COLON tpe_id = tpe_id
-| fields = separated_list(COMMA, ID COLON tpe_id) }
-*)

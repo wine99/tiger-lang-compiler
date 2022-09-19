@@ -1,5 +1,3 @@
 (library
-        (name tigermain)
-        (libraries stdio cmdliner tigercommon tigerlexer tigerparser)
-        )
-
+ (name tigermain)
+ (libraries stdio cmdliner tigercommon tigerlexer tigerparser))

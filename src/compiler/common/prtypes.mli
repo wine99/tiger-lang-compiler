@@ -4,5 +4,6 @@
 
 (** Types pretty printing interface *)
 
-val string_of_type : ?max_unfolds:int -> Types.ty -> string 
+val string_of_type : ?max_unfolds:int -> Types.ty -> string
+
 val print_type : out_channel * Types.ty -> unit
