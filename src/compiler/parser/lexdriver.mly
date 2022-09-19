@@ -1,23 +1,7 @@
 (**************************************************************************)
-(* AU compilation.                                                        *)
-(*                                                                        *)
-(* Lexer Assignment submissions must not modify this file                 *)
-(*                                                                        *)
-(*                  Dummy parser for the Lexer assignment                 *)
+(* AU Compilation. Assignment submissions must not modify this file       *)
+(* Do not distribute                                                      *)
 (**************************************************************************)
-
-
-
-%token EOF
-%token <string> ID
-%token <int> INT 
-%token <string> STRING 
-%token COMMA COLON SEMICOLON 
-%token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE 
-%token DOT PLUS MINUS TIMES DIVIDE EQ NEQ LT LE GT GE 
-%token AND OR ASSIGN ARRAY IF THEN ELSE WHILE FOR TO DO
-%token LET IN END OF BREAK NIL FUNCTION VAR TYPE CARET 
-
 
 
 %start <(string * Lexing.position) list> lexdriver
@@ -27,6 +11,7 @@
 (* only needed for the lexer assignment before student 
    get to implement full parser 
 *)
+
 
 anytoken:
   | id = ID { "ID " ^ id, $startpos } 

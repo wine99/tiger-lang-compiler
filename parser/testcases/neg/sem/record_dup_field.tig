@@ -1,6 +1,0 @@
-/* error: duplicate field in record */
-let
-    type rec = {a: int, a: string}
-in
-    0
-end

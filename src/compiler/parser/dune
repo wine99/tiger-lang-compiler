@@ -1,7 +1,10 @@
 (library
- (name tigerparser))
+        (name tigerparser)
+        (libraries tigercommon)
+        )
 
 (menhir
- (merge_into parser)
- (modules lexdriver)
- (flags --explain))
+  (merge_into parser)
+  (modules parser lexdriver)
+  (flags --explain --dump)
+)

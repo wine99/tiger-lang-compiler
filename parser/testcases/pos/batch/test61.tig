@@ -1,7 +1,0 @@
-/* string comparison via variable */
-let
-    var s := "whatever"
-in
-    s > "else"
-end
-

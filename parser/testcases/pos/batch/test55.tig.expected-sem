@@ -1,6 +1,0 @@
-(INT,
-  OpExp(TimesOp,
-  | (INT,
-  |   IntExp(3)),
-  | (INT,
-  |   IntExp(3))))

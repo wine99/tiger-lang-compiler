@@ -1,6 +1,0 @@
-(INT,
-  OpExp(NeqOp,
-  | (STRING,
-  |   StringExp("whatever")),
-  | (STRING,
-  |   StringExp("whateverelse"))))

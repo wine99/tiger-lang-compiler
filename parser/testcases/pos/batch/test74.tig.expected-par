@@ -1,6 +1,0 @@
-OpExp(TimesOp,
-  IntExp(4),
-  SeqExp[
-  | OpExp(TimesOp,
-  |   IntExp(3),
-  |   IntExp(2))])

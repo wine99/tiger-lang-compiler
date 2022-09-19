@@ -1,3 +1,0 @@
-/* this is a /* nested */  comment */
-
-"Hello" + 12 + "42"

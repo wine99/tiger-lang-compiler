@@ -1,5 +1,0 @@
-SeqExp[
-  IntExp(1),
-  IntExp(2),
-  IntExp(3),
-  NilExp]

@@ -1,9 +1,0 @@
-LetExp([
-  FunctionDec[
-  | (f,[
-  |   (n,true,int)],
-  |   SOME(int),
-  |   IntExp(42))]],
-  SeqExp[
-  | CallExp(f,[
-  |   IntExp(10)])])

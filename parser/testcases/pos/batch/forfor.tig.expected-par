@@ -1,8 +1,0 @@
-ForExp(i,true,
-  IntExp(1),
-  IntExp(2),
-  ForExp(j,true,
-  | IntExp(1),
-  | IntExp(6),
-  | CallExp(print,[
-  |   StringExp(".")])))

@@ -1,8 +1,0 @@
-LetExp([
-  TypeDec[
-  | (rec,
-  |   RecordTy[
-  |   | (a,true,int),
-  |   | (a,true,string)])]],
-  SeqExp[
-  | IntExp(0)])

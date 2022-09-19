@@ -1,2 +1,0 @@
-/* minimal test: string comparison */
-"whatever" <> "whateverelse"

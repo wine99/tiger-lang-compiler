@@ -1,3 +1,0 @@
-/* minimal test: top-level function call */
-ord("0")
-

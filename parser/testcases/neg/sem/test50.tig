@@ -1,2 +1,0 @@
-/* error: for with assign-to-index violation */
-for i := 0 to 100 do (i := 1; ())

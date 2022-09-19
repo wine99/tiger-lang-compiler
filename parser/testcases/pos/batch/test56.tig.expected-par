@@ -1,5 +1,0 @@
-OpExp(PlusOp,
-  OpExp(PlusOp,
-  | IntExp(2),
-  | IntExp(3)),
-  IntExp(4))

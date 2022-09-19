@@ -1,6 +1,0 @@
-(INT,
-  OpExp(PlusOp,
-  | (INT,
-  |   IntExp(2)),
-  | (INT,
-  |   IntExp(2))))
