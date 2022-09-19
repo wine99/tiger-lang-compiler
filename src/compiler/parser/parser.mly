@@ -8,6 +8,7 @@
   open Tigercommon.Absyn
   open ParserAux
   open Tigercommon.Symbol
+  let flattenSeqExp x = x (* Identity function for now, refactor later *)
 %}
 
 %token EOF
@@ -41,6 +42,7 @@ exp_base:
 | MINUS right = exp %prec UMINUS { let left = (IntExp 0) ^! $startpos  in let oper = MinusOp in OpExp { left ; oper ; right } } (* Unary minus *)
 | left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
 | typ = id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
+| head = exp SEMICOLON tail = exp { SeqExp (flattenSeqExp [head ; tail]) }
 
 
 record_field:
