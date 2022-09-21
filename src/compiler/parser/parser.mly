@@ -75,7 +75,7 @@ type_id:
 | sym = sym_id { (sym, $startpos(sym)) }
 
 opt_type_ascript:
-| ota = opt_type_ascript { ota }
+| ota = option(preceded(COLON, type_id)) { ota }
 
 
 // unmatched_if_then_exp:
