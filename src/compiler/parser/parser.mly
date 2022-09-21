@@ -41,7 +41,7 @@ exp_base:
 | i = INT    { IntExp i    }
 | s = STRING { StringExp s }
 | func = sym_id LPAREN args = separated_list(COMMA, exp) RPAREN { CallExp { func ; args } }
-| MINUS right = exp %prec UMINUS { let left = (IntExp 0) ^! $startpos  in let oper = MinusOp in OpExp { left ; oper ; right } } (* Unary minus *)
+| MINUS right = exp %prec UMINUS { OpExp { left = (IntExp 0) ^! $startpos ; oper = MinusOp in OpExp ; right } } (* Unary minus *)
 | left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
 | typ = sym_id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
 | head = exp SEMICOLON tail = exp { SeqExp ([head ; tail]) }
