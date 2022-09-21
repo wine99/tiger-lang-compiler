@@ -52,34 +52,30 @@ exp_base:
 | BREAK { BreakExp }
 | LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = exp END { LetExp { decls ; body } }
 
+
 decl:
-| fundecldata = list(fundecldata) { FunctionDec fundecldata }
+| fundecldata = list(fundecldata)                            { FunctionDec fundecldata }
 | VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
-| TYPE tydecldata = list(tydecldata) { TypeDec tydecldata }
+| TYPE tydecldata = list(tydecldata)                         { TypeDec tydecldata }
+
 
 fundecldata:
-| FUNCTION name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
+| FUNCTION name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp
+  { Fdecl { name ; params ; result ; body ; pos = $startpos } }
+
 
 fielddata:
 | l = separated_list(COMMA, one_fielddata) { l }
 
+
 tydecldata:
 | name = sym_id EQ ty = base_typ { Tdecl { name ; ty ; pos = $startpos } }
 
+
 base_typ:
-| t = sym_id { NameTy (t, $startpos) }
-| LBRACE t = fielddata RBRACE { RecordTy t }
-| ARRAY OF t = sym_id { ArrayTy (t, $startpos) }
-
-type_id:
-| sym = sym_id { (sym, $startpos(sym)) }
-
-opt_type_ascript:
-| ota = option(preceded(COLON, type_id)) { ota }
-
-one_fielddata:
-| name = sym_id COLON typ = type_id { Field { name ; escape = ref false ; typ ; pos = $startpos } }
-
+| t = sym_id                  { NameTy (t, $startpos)  }
+| LBRACE t = fielddata RBRACE { RecordTy t             }
+| ARRAY OF t = sym_id         { ArrayTy (t, $startpos) }
 
 // unmatched_if_then_exp:
 // | IF test = exp THEN thn = exp { let els = None in IfExp { test ; thn ; els } }
@@ -94,8 +90,8 @@ exp:
 
 (* Variables *)
 var_base:
-| id = sym_id                       { SimpleVar    id      }
-| v = var DOT id = sym_id           { FieldVar     (v, id) }
+| id = sym_id                   { SimpleVar    id      }
+| v = var DOT id = sym_id       { FieldVar     (v, id) }
 | v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)  }
 
 var:
@@ -119,3 +115,14 @@ sym_id:
 | TIMES  { TimesOp    }
 | DIVIDE { DivideOp   }
 | CARET  { ExponentOp }
+
+type_id:
+| sym = sym_id { (sym, $startpos(sym)) }
+
+
+opt_type_ascript:
+| ota = option(preceded(COLON, type_id)) { ota }
+
+
+one_fielddata:
+| name = sym_id COLON typ = type_id { Field { name ; escape = ref false ; typ ; pos = $startpos } }
