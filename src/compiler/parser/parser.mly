@@ -23,6 +23,8 @@
 (* Operator Precedence & Associativity *)
 %nonassoc SEMICOLON
 %right ASSIGN
+%right THEN
+%right ELSE
 %right DO
 %right OF
 %nonassoc EQ NEQ LT LE GT GE
@@ -47,7 +49,10 @@ exp_base:
 | typ = sym_id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
 | head = exp SEMICOLON tail = exp { SeqExp ([head ; tail]) }
 | var = var ASSIGN exp = exp { AssignExp { var ; exp } }
-// | IF test = exp THEN e1 = exp_base ELSE e2 = exp_base { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
+| IF test = exp THEN thn = exp ELSE els = exp
+  { IfExp { test ; thn ; els = Some els }}
+| IF test = exp THEN thn = exp
+  { IfExp { test ; thn ; els = None }}
 | WHILE test = exp DO body = exp { WhileExp { test ; body } }
 | FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp { ForExp { var ; escape = ref false ; lo ; hi ; body } }
 | BREAK { BreakExp }
@@ -79,16 +84,12 @@ base_typ:
 | LBRACE t = fielddata RBRACE { RecordTy t             }
 | ARRAY OF t = sym_id         { ArrayTy (t, $startpos) }
 
-// unmatched_if_then_exp:
-// | IF test = exp THEN thn = exp { let els = None in IfExp { test ; thn ; els } }
-// | IF test = exp THEN e1 = exp_base ELSE e2 = unmatched_if_then_exp { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
 
 (* Top-level *)
 program: e = exp EOF { e }
 
 exp:
 | e = exp_base  { e ^! $startpos }
-// | e = unmatched_if_then_exp { e ^! $startpos }
 
 (* Variables *)
 var_base:
