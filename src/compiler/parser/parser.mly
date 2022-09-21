@@ -48,13 +48,32 @@ exp_base:
 | var = var ASSIGN exp = exp { AssignExp { var ; exp } }
 // | IF test = exp THEN e1 = exp_base ELSE e2 = exp_base { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
 | WHILE test = exp DO body = exp { WhileExp { test ; body } }
-| FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp { ForExp { var ; escape = ref true ; lo ; hi ; body } }
+| FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp { ForExp { var ; escape = ref false ; lo ; hi ; body } }
 | BREAK { BreakExp }
+| LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = exp END { LetExp { decls ; body } }
 
+decl:
+| VAR name = sym_id ASSIGN init = exp { VarDec { name ; escape = ref false ; typ = None ; init ; pos = $startpos } }
 
 // unmatched_if_then_exp:
 // | IF test = exp THEN thn = exp { let els = None in IfExp { test ; thn ; els } }
 // | IF test = exp THEN e1 = exp_base ELSE e2 = unmatched_if_then_exp { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
+
+(* Top-level *)
+program: e = exp EOF { e }
+
+exp:
+| e = exp_base  { e ^! $startpos }
+// | e = unmatched_if_then_exp { e ^! $startpos }
+
+(* Variables *)
+var_base:
+| id = sym_id                       { SimpleVar    id      }
+| v = var DOT id = sym_id           { FieldVar     (v, id) }
+| v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)  }
+
+var:
+| v = var_base { v ^@ $startpos }
 
 record_field:
 | symbol = sym_id EQ exp = exp { (symbol, exp) }
@@ -74,19 +93,3 @@ sym_id:
 | TIMES  { TimesOp    }
 | DIVIDE { DivideOp   }
 | CARET  { ExponentOp }
-
-(* Top-level *)
-program: e = exp EOF { e }
-
-exp:
-| e = exp_base  { e ^! $startpos }
-// | e = unmatched_if_then_exp { e ^! $startpos }
-
-(* Variables *)
-var_base:
-| id = sym_id                       { SimpleVar    id      }
-| v = var DOT id = sym_id           { FieldVar     (v, id) }
-| v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)  }
-
-var:
-| v = var_base { v ^@ $startpos }
