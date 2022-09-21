@@ -23,6 +23,7 @@
 (* Operator Precedence & Associativity *)
 %nonassoc SEMICOLON
 %right ASSIGN
+%right DO
 %nonassoc EQ NEQ LT LE GT GE
 %left PLUS MINUS
 %left TIMES DIVIDE
@@ -46,6 +47,7 @@ exp_base:
 | head = exp SEMICOLON tail = exp { SeqExp ([head ; tail]) }
 | var = var ASSIGN exp = exp { AssignExp { var ; exp } }
 // | IF test = exp THEN e1 = exp_base ELSE e2 = exp_base { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
+| WHILE test = exp DO body = exp { WhileExp { test ; body } }
 
 // unmatched_if_then_exp:
 // | IF test = exp THEN thn = exp { let els = None in IfExp { test ; thn ; els } }
@@ -75,7 +77,7 @@ program: e = exp EOF { e }
 
 exp:
 | e = exp_base  { e ^! $startpos }
-| e = unmatched_if_then_exp { e ^! $startpos }
+// | e = unmatched_if_then_exp { e ^! $startpos }
 
 (* Variables *)
 var_base:
