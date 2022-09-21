@@ -24,7 +24,7 @@
 %nonassoc EQ NEQ LT LE GT GE
 %left PLUS MINUS
 %left TIMES DIVIDE
-// %nonassoc UMINUS
+%nonassoc UMINUS
 %right CARET
 
 %start <Tigercommon.Absyn.exp> program
@@ -38,7 +38,7 @@ exp_base:
 | i = INT    { IntExp i    }
 | s = STRING { StringExp s }
 | func = id LPAREN args = separated_list(COMMA, exp) RPAREN { CallExp { func ; args } }
-// | MINUS right = exp %prec UMINUS { let left = (IntExp 0) ^! $startpos  in let oper = MinusOp in OpExp { left ; oper ; right } } (* Unary minus *)
+| MINUS right = exp %prec UMINUS { let left = (IntExp 0) ^! $startpos  in let oper = MinusOp in OpExp { left ; oper ; right } } (* Unary minus *)
 | left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
 | typ = id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
 | head = exp SEMICOLON tail = exp { SeqExp ([head ; tail]) }
@@ -52,7 +52,7 @@ record_field:
 id:
 | id = ID { symbol id }
 
-oper:
+%inline oper:
 | EQ     { EqOp       }
 | NEQ    { NeqOp      }
 | LT     { LtOp       }
