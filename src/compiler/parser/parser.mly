@@ -71,8 +71,6 @@ base_typ:
 | LBRACE t = separated_list(COMMA, fielddata) RBRACE { RecordTy t }
 | ARRAY OF t = sym_id { ArrayTy (t, $startpos) }
 
-// rename sym_id -> id_sym
-// rename type_id -> type_sym
 // opt_type_ascrip ??
 
 type_id:
