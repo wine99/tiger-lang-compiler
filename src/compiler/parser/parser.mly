@@ -74,6 +74,7 @@ simple_typ:
 // rename sym_id -> id_sym
 // rename type_id -> type_sym
 // opt_type_ascrip ??
+// rename simple_typ -> base_typ
 
 type_id:
 | sym = sym_id { (sym, $startpos(sym)) }
