@@ -53,7 +53,18 @@ exp_base:
 | LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = exp END { LetExp { decls ; body } }
 
 decl:
+| fundecldata = list(fundecldata) { FunctionDec fundecldata }
 | VAR name = sym_id typ = option(preceded(COLON, type_id)) ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
+
+fundecldata:
+| FUNCTION name = sym_id LPAREN params = separated_list(COMMA, fielddata) RPAREN result = option(preceded(COLON, type_id)) EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
+
+fielddata:
+| name = sym_id COLON typ = type_id { Field { name ; escape = ref false ; typ ; pos = $startpos } }
+
+// rename sym_id -> id_sym
+// rename type_id -> type_sym
+// opt_type_ascrip ??
 
 type_id:
 | sym = sym_id { (sym, $startpos(sym)) }
