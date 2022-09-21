@@ -58,17 +58,17 @@ decl:
 | TYPE tydecldata = list(tydecldata) { TypeDec tydecldata }
 
 fundecldata:
-| FUNCTION name = sym_id LPAREN params = separated_list(COMMA, fielddata) RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
+| FUNCTION name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
 
 fielddata:
-| name = sym_id COLON typ = type_id { Field { name ; escape = ref false ; typ ; pos = $startpos } }
+| l = separated_list(COMMA, one_fielddata) { l }
 
 tydecldata:
 | name = sym_id EQ ty = base_typ { Tdecl { name ; ty ; pos = $startpos } }
 
 base_typ:
 | t = sym_id { NameTy (t, $startpos) }
-| LBRACE t = separated_list(COMMA, fielddata) RBRACE { RecordTy t }
+| LBRACE t = fielddata RBRACE { RecordTy t }
 | ARRAY OF t = sym_id { ArrayTy (t, $startpos) }
 
 type_id:
@@ -76,6 +76,9 @@ type_id:
 
 opt_type_ascript:
 | ota = option(preceded(COLON, type_id)) { ota }
+
+one_fielddata:
+| name = sym_id COLON typ = type_id { Field { name ; escape = ref false ; typ ; pos = $startpos } }
 
 
 // unmatched_if_then_exp:
