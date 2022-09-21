@@ -21,6 +21,8 @@
 %token LET IN END OF BREAK NIL FUNCTION VAR TYPE CARET
 
 (* Operator Precedence & Associativity *)
+%nonassoc SEMICOLON
+%right ASSIGN
 %nonassoc EQ NEQ LT LE GT GE
 %left PLUS MINUS
 %left TIMES DIVIDE
@@ -43,7 +45,7 @@ exp_base:
 | typ = id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
 | head = exp SEMICOLON tail = exp { SeqExp ([head ; tail]) }
 | var = var ASSIGN exp = exp { AssignExp { var ; exp } }
-| IF test = exp THEN thn = exp els = option(preceded(ELSE, exp)) { IfExp { test ; thn ; els } }
+// | IF test = exp THEN thn = exp els = option(preceded(ELSE, exp)) { IfExp { test ; thn ; els } }
 
 
 record_field:
