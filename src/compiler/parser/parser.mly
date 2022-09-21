@@ -24,6 +24,7 @@
 %nonassoc SEMICOLON
 %right ASSIGN
 %right DO
+%right OF
 %nonassoc EQ NEQ LT LE GT GE
 %left PLUS MINUS
 %left TIMES DIVIDE
@@ -51,6 +52,7 @@ exp_base:
 | FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp { ForExp { var ; escape = ref false ; lo ; hi ; body } }
 | BREAK { BreakExp }
 | LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = exp END { LetExp { decls ; body } }
+| typ = sym_id size = subscript_exp OF init = exp { ArrayExp { typ; size ; init } }
 
 
 decl:
@@ -90,9 +92,12 @@ exp:
 
 (* Variables *)
 var_base:
-| id = sym_id                   { SimpleVar    id      }
-| v = var DOT id = sym_id       { FieldVar     (v, id) }
-| v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)  }
+| id = sym_id               { SimpleVar    id      } // Solve this shift reduce conflict w subscript_exp
+| v = var DOT id = sym_id   { FieldVar     (v, id) }
+| v = var e = subscript_exp { SubscriptVar (v, e)  }
+
+subscript_exp:
+| LBRACK e = exp RBRACK { e }
 
 var:
 | v = var_base { v ^@ $startpos }
