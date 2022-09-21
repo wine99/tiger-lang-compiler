@@ -53,10 +53,11 @@ exp_base:
 | LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = exp END { LetExp { decls ; body } }
 
 decl:
-| VAR name = sym_id typ = option(preceded(COLON, type_ascription)) ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
+| VAR name = sym_id typ = option(preceded(COLON, type_id)) ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
 
-type_ascription:
+type_id:
 | sym = sym_id { (sym, $startpos(sym)) }
+
 
 // unmatched_if_then_exp:
 // | IF test = exp THEN thn = exp { let els = None in IfExp { test ; thn ; els } }
