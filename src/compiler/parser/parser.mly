@@ -39,36 +39,33 @@
 %%
 (* Expressions *)
 exp_base:
-| v = var    { VarExp v    }
-| NIL        { NilExp      }
-| i = INT    { IntExp i    }
-| s = STRING { StringExp s }
-| func = sym_id LPAREN args = separated_list(COMMA, exp) RPAREN { CallExp { func ; args } }
-| MINUS right = exp %prec UMINUS { OpExp { left = (IntExp 0) ^! $startpos(right) ; oper = MinusOp ; right } } (* Unary minus *)
-| left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
-| typ = sym_id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
-| head = exp SEMICOLON tail = exp { SeqExp ([head ; tail]) }
-| var = var ASSIGN exp = exp { AssignExp { var ; exp } }
-| IF test = exp THEN thn = exp ELSE els = exp
-  { IfExp { test ; thn ; els = Some els }}
-| IF test = exp THEN thn = exp
-  { IfExp { test ; thn ; els = None }}
-| WHILE test = exp DO body = exp { WhileExp { test ; body } }
-| FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp { ForExp { var ; escape = ref false ; lo ; hi ; body } }
-| BREAK { BreakExp }
-| LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = exp END { LetExp { decls ; body } }
-| typ = sym_id size = subscript_exp OF init = exp { ArrayExp { typ; size ; init } }
+| v = var                                                                     { VarExp v                                                                     }
+| i = INT                                                                     { IntExp i                                                                     }
+| s = STRING                                                                  { StringExp s                                                                  }
+| NIL                                                                         { NilExp                                                                       }
+| BREAK                                                                       { BreakExp                                                                     }
+| func = sym_id LPAREN args = separated_list(COMMA, exp) RPAREN               { CallExp   { func ; args                                                    } }
+| MINUS right = exp %prec UMINUS                 (* Unary minus *)            { OpExp     { left = (IntExp 0) ^! $startpos(right) ; oper = MinusOp ; right } }
+| left = exp oper = oper right = exp                                          { OpExp     { left ; oper ; right                                            } }
+| typ = sym_id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ                                                   } }
+| head = exp SEMICOLON tail = exp                                             { SeqExp    [head ; tail]                                                      }
+| var = var ASSIGN exp = exp                                                  { AssignExp { var ; exp                                                      } }
+| IF test = exp THEN thn = exp ELSE els = exp                                 { IfExp     { test ; thn ; els = Some els                                    } }
+| IF test = exp THEN thn = exp                                                { IfExp     { test ; thn ; els = None                                        } }
+| WHILE test = exp DO body = exp                                              { WhileExp  { test ; body                                                    } }
+| FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp                  { ForExp    { var ; escape = ref false ; lo ; hi ; body                      } }
+| LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = exp END      { LetExp    { decls ; body                                                   } }
+| typ = sym_id size = subscript_exp OF init = exp                             { ArrayExp  { typ; size ; init                                               } }
 
 
 decl:
-| fundecldata = list(fundecldata)                            { FunctionDec fundecldata }
+| fundecldata = list(fundecldata)                            { FunctionDec fundecldata                                             }
 | VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
-| TYPE tydecldata = list(tydecldata)                         { TypeDec tydecldata }
+| TYPE tydecldata = list(tydecldata)                         { TypeDec tydecldata                                                  }
 
 
 fundecldata:
-| FUNCTION name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp
-  { Fdecl { name ; params ; result ; body ; pos = $startpos } }
+| FUNCTION name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
 
 
 fielddata:
@@ -80,7 +77,7 @@ tydecldata:
 
 
 base_typ:
-| t = sym_id                  { NameTy (t, $startpos)  }
+| t = sym_id                  { NameTy  (t, $startpos) }
 | LBRACE t = fielddata RBRACE { RecordTy t             }
 | ARRAY OF t = sym_id         { ArrayTy (t, $startpos) }
 
@@ -95,7 +92,7 @@ exp:
 var_base:
 | id = sym_id               { SimpleVar    id      } // Solve this shift reduce conflict w subscript_exp
 | v = var DOT id = sym_id   { FieldVar     (v, id) }
-| v = var e = subscript_exp { SubscriptVar (v, e)  }
+| v = var e = subscript_exp { SubscriptVar (v, e ) }
 
 subscript_exp:
 | LBRACK e = exp RBRACK { e }
