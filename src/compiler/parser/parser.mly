@@ -41,7 +41,7 @@ exp_base:
 | i = INT    { IntExp i    }
 | s = STRING { StringExp s }
 | func = sym_id LPAREN args = separated_list(COMMA, exp) RPAREN { CallExp { func ; args } }
-| MINUS right = exp %prec UMINUS { OpExp { left = (IntExp 0) ^! $startpos ; oper = MinusOp in OpExp ; right } } (* Unary minus *)
+| MINUS right = exp %prec UMINUS { OpExp { left = (IntExp 0) ^! $startpos(right) ; oper = MinusOp ; right } } (* Unary minus *)
 | left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
 | typ = sym_id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
 | head = exp SEMICOLON tail = exp { SeqExp ([head ; tail]) }
@@ -53,7 +53,10 @@ exp_base:
 | LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = exp END { LetExp { decls ; body } }
 
 decl:
-| VAR name = sym_id ASSIGN init = exp { VarDec { name ; escape = ref false ; typ = None ; init ; pos = $startpos } }
+| VAR name = sym_id typ = option(preceded(COLON, type_ascription)) ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
+
+type_ascription:
+| sym = sym_id { (sym, $startpos(sym)) }
 
 // unmatched_if_then_exp:
 // | IF test = exp THEN thn = exp { let els = None in IfExp { test ; thn ; els } }
