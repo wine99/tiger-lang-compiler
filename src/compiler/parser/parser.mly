@@ -40,23 +40,24 @@ exp_base:
 | NIL        { NilExp      }
 | i = INT    { IntExp i    }
 | s = STRING { StringExp s }
-| func = id LPAREN args = separated_list(COMMA, exp) RPAREN { CallExp { func ; args } }
+| func = sym_id LPAREN args = separated_list(COMMA, exp) RPAREN { CallExp { func ; args } }
 | MINUS right = exp %prec UMINUS { let left = (IntExp 0) ^! $startpos  in let oper = MinusOp in OpExp { left ; oper ; right } } (* Unary minus *)
 | left = exp oper = oper right = exp { OpExp { left ; oper ; right } }
-| typ = id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
+| typ = sym_id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
 | head = exp SEMICOLON tail = exp { SeqExp ([head ; tail]) }
 | var = var ASSIGN exp = exp { AssignExp { var ; exp } }
 // | IF test = exp THEN e1 = exp_base ELSE e2 = exp_base { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
 | WHILE test = exp DO body = exp { WhileExp { test ; body } }
+| FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp { ForExp { var ; escape = ref true ; lo ; hi ; body } }
 
 // unmatched_if_then_exp:
 // | IF test = exp THEN thn = exp { let els = None in IfExp { test ; thn ; els } }
 // | IF test = exp THEN e1 = exp_base ELSE e2 = unmatched_if_then_exp { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
 
 record_field:
-| symbol = id EQ exp = exp { (symbol, exp) }
+| symbol = sym_id EQ exp = exp { (symbol, exp) }
 
-id:
+sym_id:
 | id = ID { symbol id }
 
 %inline oper:
@@ -81,8 +82,8 @@ exp:
 
 (* Variables *)
 var_base:
-| id = id                       { SimpleVar    id      }
-| v = var DOT id = id           { FieldVar     (v, id) }
+| id = sym_id                       { SimpleVar    id      }
+| v = var DOT id = sym_id           { FieldVar     (v, id) }
 | v = var LBRACK e = exp RBRACK { SubscriptVar (v, e)  }
 
 var:
