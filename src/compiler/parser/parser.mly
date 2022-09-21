@@ -67,9 +67,9 @@ tydecldata:
 | name = sym_id EQ ty = simple_typ { Tdecl { name ; ty ; pos = $startpos } }
 
 simple_typ:
-//| t = type_id { NameTy t }
+| t = sym_id { NameTy (t, $startpos) }
 | LBRACE t = separated_list(COMMA, fielddata) RBRACE { RecordTy t }
-//| ARRAY OF t = type_id { ArrayTy t }
+| ARRAY OF t = sym_id { ArrayTy (t, $startpos) }
 
 // rename sym_id -> id_sym
 // rename type_id -> type_sym
