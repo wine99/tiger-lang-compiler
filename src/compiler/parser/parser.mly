@@ -54,11 +54,11 @@ exp_base:
 
 decl:
 | fundecldata = list(fundecldata) { FunctionDec fundecldata }
-| VAR name = sym_id typ = option(preceded(COLON, type_id)) ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
+| VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
 | TYPE tydecldata = list(tydecldata) { TypeDec tydecldata }
 
 fundecldata:
-| FUNCTION name = sym_id LPAREN params = separated_list(COMMA, fielddata) RPAREN result = option(preceded(COLON, type_id)) EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
+| FUNCTION name = sym_id LPAREN params = separated_list(COMMA, fielddata) RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
 
 fielddata:
 | name = sym_id COLON typ = type_id { Field { name ; escape = ref false ; typ ; pos = $startpos } }
@@ -71,10 +71,11 @@ base_typ:
 | LBRACE t = separated_list(COMMA, fielddata) RBRACE { RecordTy t }
 | ARRAY OF t = sym_id { ArrayTy (t, $startpos) }
 
-// opt_type_ascrip ??
-
 type_id:
 | sym = sym_id { (sym, $startpos(sym)) }
+
+opt_type_ascript:
+| ota = opt_type_ascript { ota }
 
 
 // unmatched_if_then_exp:
