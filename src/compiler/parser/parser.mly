@@ -64,9 +64,9 @@ fielddata:
 | name = sym_id COLON typ = type_id { Field { name ; escape = ref false ; typ ; pos = $startpos } }
 
 tydecldata:
-| name = sym_id EQ ty = simple_typ { Tdecl { name ; ty ; pos = $startpos } }
+| name = sym_id EQ ty = base_typ { Tdecl { name ; ty ; pos = $startpos } }
 
-simple_typ:
+base_typ:
 | t = sym_id { NameTy (t, $startpos) }
 | LBRACE t = separated_list(COMMA, fielddata) RBRACE { RecordTy t }
 | ARRAY OF t = sym_id { ArrayTy (t, $startpos) }
@@ -74,7 +74,6 @@ simple_typ:
 // rename sym_id -> id_sym
 // rename type_id -> type_sym
 // opt_type_ascrip ??
-// rename simple_typ -> base_typ
 
 type_id:
 | sym = sym_id { (sym, $startpos(sym)) }
