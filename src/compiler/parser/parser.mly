@@ -49,6 +49,8 @@ exp_base:
 // | IF test = exp THEN e1 = exp_base ELSE e2 = exp_base { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
 | WHILE test = exp DO body = exp { WhileExp { test ; body } }
 | FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp { ForExp { var ; escape = ref true ; lo ; hi ; body } }
+| BREAK { BreakExp }
+
 
 // unmatched_if_then_exp:
 // | IF test = exp THEN thn = exp { let els = None in IfExp { test ; thn ; els } }
