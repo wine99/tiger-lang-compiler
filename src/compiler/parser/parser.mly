@@ -55,7 +55,7 @@ exp_base:
 decl:
 | fundecldata = list(fundecldata) { FunctionDec fundecldata }
 | VAR name = sym_id typ = option(preceded(COLON, type_id)) ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
-| TYPE tydecldata = list(tydecldata) { TypeDec { tydecldata } }
+| TYPE tydecldata = list(tydecldata) { TypeDec tydecldata }
 
 fundecldata:
 | FUNCTION name = sym_id LPAREN params = separated_list(COMMA, fielddata) RPAREN result = option(preceded(COLON, type_id)) EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
@@ -67,9 +67,9 @@ tydecldata:
 | name = sym_id EQ ty = simple_typ { Tdecl { name ; ty ; pos = $startpos } }
 
 simple_typ:
-| t = type_id { NameTy t }
+//| t = type_id { NameTy t }
 | LBRACE t = separated_list(COMMA, fielddata) RBRACE { RecordTy t }
-| ARRAY OF t = type_id { ArrayTy t }
+//| ARRAY OF t = type_id { ArrayTy t }
 
 // rename sym_id -> id_sym
 // rename type_id -> type_sym
