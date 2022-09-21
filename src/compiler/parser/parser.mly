@@ -45,8 +45,11 @@ exp_base:
 | typ = id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ } }
 | head = exp SEMICOLON tail = exp { SeqExp ([head ; tail]) }
 | var = var ASSIGN exp = exp { AssignExp { var ; exp } }
-// | IF test = exp THEN thn = exp els = option(preceded(ELSE, exp)) { IfExp { test ; thn ; els } }
+// | IF test = exp THEN e1 = exp_base ELSE e2 = exp_base { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
 
+// unmatched_if_then_exp:
+// | IF test = exp THEN thn = exp { let els = None in IfExp { test ; thn ; els } }
+// | IF test = exp THEN e1 = exp_base ELSE e2 = unmatched_if_then_exp { let thn = e1 ^! $startpos in let els = Some (e2 ^! $startpos) in IfExp { test ; thn ; els } }
 
 record_field:
 | symbol = id EQ exp = exp { (symbol, exp) }
@@ -72,6 +75,7 @@ program: e = exp EOF { e }
 
 exp:
 | e = exp_base  { e ^! $startpos }
+| e = unmatched_if_then_exp { e ^! $startpos }
 
 (* Variables *)
 var_base:
