@@ -21,7 +21,6 @@
 %token LET IN END OF BREAK NIL FUNCTION VAR TYPE CARET
 
 (* Operator Precedence & Associativity *)
-%nonassoc SEMICOLON
 %right ASSIGN
 %right THEN
 %right ELSE
@@ -38,6 +37,7 @@
 
 %%
 (* Expressions *)
+// TODO what does escape do
 exp_base:
 | v = var                                                                     { VarExp v                                                                     }
 | i = INT                                                                     { IntExp i                                                                     }
@@ -48,19 +48,23 @@ exp_base:
 | MINUS right = exp %prec UMINUS                 (* Unary minus *)            { OpExp     { left = (IntExp 0) ^! $startpos(right) ; oper = MinusOp ; right } }
 | left = exp oper = oper right = exp                                          { OpExp     { left ; oper ; right                                            } }
 | typ = sym_id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ                                                   } }
-| head = exp SEMICOLON tail = exp                                             { SeqExp    [head ; tail]                                                      }
+| LPAREN seq = separated_list(SEMICOLON, exp) RPAREN                          { SeqExp    seq                                                                }
 | var = var ASSIGN exp = exp                                                  { AssignExp { var ; exp                                                      } }
 | IF test = exp THEN thn = exp ELSE els = exp                                 { IfExp     { test ; thn ; els = Some els                                    } }
 | IF test = exp THEN thn = exp                                                { IfExp     { test ; thn ; els = None                                        } }
 | WHILE test = exp DO body = exp                                              { WhileExp  { test ; body                                                    } }
-| FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp                  { ForExp    { var ; escape = ref false ; lo ; hi ; body                      } }
-| LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = exp END      { LetExp    { decls ; body                                                   } }
+| FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp                  { ForExp    { var ; escape = ref true ; lo ; hi ; body                       } }
+// TODO decl is not seperated by SEMECOLON
+| LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = expseq END   { LetExp    { decls ; body                                                   } }
 | typ = sym_id size = subscript_exp OF init = exp                             { ArrayExp  { typ; size ; init                                               } }
+
+expseq:
+| seq = separated_nonempty_list(SEMICOLON, exp) { (SeqExp seq) ^! $startpos}
 
 
 decl:
 | fundecldata = list(fundecldata)                            { FunctionDec fundecldata                                             }
-| VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp { VarDec { name ; escape = ref false ; typ ; init ; pos = $startpos } }
+| VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp { VarDec { name ; escape = ref true ; typ ; init ; pos = $startpos  } }
 | TYPE tydecldata = list(tydecldata)                         { TypeDec tydecldata                                                  }
 
 
@@ -128,4 +132,4 @@ opt_type_ascript:
 
 
 one_fielddata:
-| name = sym_id COLON typ = type_id { Field { name ; escape = ref false ; typ ; pos = $startpos } }
+| name = sym_id COLON typ = type_id { Field { name ; escape = ref true ; typ ; pos = $startpos } }
