@@ -25,9 +25,9 @@
 %right THEN
 %right ELSE
 %right DO
-%nonassoc OF
-%nonassoc EQ NEQ LT LE GT GE
+// %nonassoc OF
 %left OR AND
+%nonassoc EQ NEQ LT LE GT GE
 %left PLUS MINUS
 %left TIMES DIVIDE
 %nonassoc UMINUS
@@ -48,6 +48,8 @@ exp_base:
 | func = sym_id LPAREN args = separated_list(COMMA, exp) RPAREN               { CallExp   { func ; args }                                                    }
 | MINUS right = exp %prec UMINUS                 (* Unary minus *)            { OpExp     { left = (IntExp 0) ^! $startpos(right) ; oper = MinusOp ; right } }
 | left = exp oper = oper right = exp                                          { OpExp     { left ; oper ; right }                                            }
+| left = exp AND right = exp                                                  { IfExp     { test = left ; thn = right ; els = Some ((IntExp 0) ^! $startpos) } }
+| left = exp OR right = exp                                                   { IfExp     { test = left ; thn = (IntExp 1) ^! $startpos ; els = Some right } }
 | typ = sym_id LBRACE fields = separated_list(COMMA, record_field) RBRACE     { RecordExp { fields ; typ }                                                   }
 | LPAREN seq = separated_list(SEMICOLON, exp) RPAREN                          { SeqExp    seq                                                                }
 | var = var ASSIGN exp = exp                                                  { AssignExp { var ; exp }                                                      }
@@ -112,8 +114,6 @@ sym_id:
 | LE     { LeOp       }
 | GT     { GtOp       }
 | GE     { GeOp       }
-| AND    { TimesOp    }
-| OR     { PlusOp     }
 | PLUS   { PlusOp     }
 | MINUS  { MinusOp    }
 | TIMES  { TimesOp    }
