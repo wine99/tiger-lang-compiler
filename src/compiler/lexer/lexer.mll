@@ -16,10 +16,8 @@
     raise (Error err_str)
 
   let bigInt str lexbuf =
-    if String.length str > 31 then
-      error lexbuf "Integer too big for system."
-    else
-      INT (int_of_string str)
+    try int_of_string str with
+      _ -> error lexbuf "Integer too big for system."
 
   let ascii_digit_range num lexbuf =
     if 0 <= num && num <= 255 then
@@ -96,7 +94,7 @@ rule token = parse
 | "do"                { DO                                                             }
 | "of"                { OF                                                             }
 | "nil"               { NIL                                                            }
-| digits              { bigInt (Lexing.lexeme lexbuf) lexbuf                           }
+| digits              { INT (bigInt (Lexing.lexeme lexbuf) lexbuf)                     }
 | illegal_id          { error lexbuf ("Invalid Identifier: " ^ Lexing.lexeme lexbuf)   }
 | id                  { ID (Lexing.lexeme lexbuf)                                      }
 | '"'                 { str (Lexing.lexeme_start_p lexbuf) "" lexbuf                   }
