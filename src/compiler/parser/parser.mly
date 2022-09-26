@@ -60,30 +60,24 @@ exp_base:
 expseq:
 | seq = separated_nonempty_list(SEMICOLON, exp) { (SeqExp seq) ^! $startpos}
 
-
 decl:
 | FUNCTION fundecldata = separated_nonempty_list(FUNCTION, fundecldata) { FunctionDec fundecldata                                             }
 | VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp            { VarDec { name ; escape = ref true ; typ ; init ; pos = $startpos  } }
 | TYPE tydecldata = separated_nonempty_list(TYPE, tydecldata)           { TypeDec tydecldata                                                  }
 
-
 fundecldata:
 | name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
-
 
 fielddata:
 | l = separated_list(COMMA, one_fielddata) { l }
 
-
 tydecldata:
 | name = sym_id EQ ty = base_typ { Tdecl { name ; ty ; pos = $startpos } }
-
 
 base_typ:
 | t = sym_id                  { NameTy  (t, $startpos) }
 | LBRACE t = fielddata RBRACE { RecordTy t             }
 | ARRAY OF t = sym_id         { ArrayTy (t, $startpos) }
-
 
 (* Top-level *)
 program: e = exp EOF { e }
@@ -125,10 +119,8 @@ sym_id:
 type_id:
 | sym = sym_id { (sym, $startpos(sym)) }
 
-
 opt_type_ascript:
 | ota = option(preceded(COLON, type_id)) { ota }
-
 
 one_fielddata:
 | name = sym_id COLON typ = type_id { Field { name ; escape = ref true ; typ ; pos = $startpos } }
