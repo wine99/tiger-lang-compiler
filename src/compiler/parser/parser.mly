@@ -25,7 +25,7 @@
 %right THEN
 %right ELSE
 %right DO
-%right OF
+%nonassoc OF
 %nonassoc EQ NEQ LT LE GT GE
 %left PLUS MINUS
 %left TIMES DIVIDE
@@ -87,7 +87,7 @@ exp:
 
 (* Variables *)
 var_base:
-| id = sym_id               { SimpleVar    id      } // Solve this shift reduce conflict w subscript_exp
+| id = sym_id               { SimpleVar    id      }
 | v = var DOT id = sym_id   { FieldVar     (v, id) }
 | v = var e = subscript_exp { SubscriptVar (v, e ) }
 
