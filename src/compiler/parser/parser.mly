@@ -27,6 +27,7 @@
 %right DO
 %nonassoc OF
 %nonassoc EQ NEQ LT LE GT GE
+%left OR AND
 %left PLUS MINUS
 %left TIMES DIVIDE
 %nonassoc UMINUS
@@ -87,9 +88,10 @@ exp:
 
 (* Variables *)
 var_base:
-| id = sym_id               { SimpleVar    id      }
-| v = var DOT id = sym_id   { FieldVar     (v, id) }
-| v = var e = subscript_exp { SubscriptVar (v, e ) }
+| id = sym_id                  { SimpleVar    id      }
+| v = var DOT id = sym_id      { FieldVar     (v, id) }
+| v = sym_id e = subscript_exp { SubscriptVar ((SimpleVar v) ^@ $startpos, e ) }
+| v = var e = subscript_exp    { SubscriptVar (v, e ) }
 
 subscript_exp:
 | LBRACK e = exp RBRACK { e }
@@ -110,6 +112,8 @@ sym_id:
 | LE     { LeOp       }
 | GT     { GtOp       }
 | GE     { GeOp       }
+| AND    { TimesOp    }
+| OR     { PlusOp     }
 | PLUS   { PlusOp     }
 | MINUS  { MinusOp    }
 | TIMES  { TimesOp    }
