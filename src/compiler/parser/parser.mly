@@ -54,7 +54,6 @@ exp_base:
 | IF test = exp THEN thn = exp                                                { IfExp     { test ; thn ; els = None }                                        }
 | WHILE test = exp DO body = exp                                              { WhileExp  { test ; body }                                                    }
 | FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp                  { ForExp    { var ; escape = ref true ; lo ; hi ; body }                       }
-// TODO decl is not seperated by SEMECOLON
 | LET decls = list(decl) IN body = expseq END                                 { LetExp    { decls ; body }                                                   }
 | typ = sym_id size = subscript_exp OF init = exp                             { ArrayExp  { typ; size ; init }                                               }
 
