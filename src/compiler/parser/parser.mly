@@ -62,9 +62,9 @@ expseq:
 
 
 decl:
-| FUNCTION fundecldata = list(fundecldata)                    { FunctionDec fundecldata                                             }
-| VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp  { VarDec { name ; escape = ref true ; typ ; init ; pos = $startpos  } }
-| TYPE tydecldata = separated_nonempty_list(TYPE, tydecldata) { TypeDec tydecldata                                                  }
+| FUNCTION fundecldata = separated_nonempty_list(FUNCTION, fundecldata) { FunctionDec fundecldata                                             }
+| VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp            { VarDec { name ; escape = ref true ; typ ; init ; pos = $startpos  } }
+| TYPE tydecldata = separated_nonempty_list(TYPE, tydecldata)           { TypeDec tydecldata                                                  }
 
 
 fundecldata:
