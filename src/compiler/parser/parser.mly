@@ -44,32 +44,32 @@ exp_base:
 | s = STRING                                                                  { StringExp s                                                                  }
 | NIL                                                                         { NilExp                                                                       }
 | BREAK                                                                       { BreakExp                                                                     }
-| func = sym_id LPAREN args = separated_list(COMMA, exp) RPAREN               { CallExp   { func ; args                                                    } }
+| func = sym_id LPAREN args = separated_list(COMMA, exp) RPAREN               { CallExp   { func ; args }                                                    }
 | MINUS right = exp %prec UMINUS                 (* Unary minus *)            { OpExp     { left = (IntExp 0) ^! $startpos(right) ; oper = MinusOp ; right } }
-| left = exp oper = oper right = exp                                          { OpExp     { left ; oper ; right                                            } }
-| typ = sym_id LBRACE fields = separated_list(SEMICOLON, record_field) RBRACE { RecordExp { fields ; typ                                                   } }
+| left = exp oper = oper right = exp                                          { OpExp     { left ; oper ; right }                                            }
+| typ = sym_id LBRACE fields = separated_list(COMMA, record_field) RBRACE     { RecordExp { fields ; typ }                                                   }
 | LPAREN seq = separated_list(SEMICOLON, exp) RPAREN                          { SeqExp    seq                                                                }
-| var = var ASSIGN exp = exp                                                  { AssignExp { var ; exp                                                      } }
-| IF test = exp THEN thn = exp ELSE els = exp                                 { IfExp     { test ; thn ; els = Some els                                    } }
-| IF test = exp THEN thn = exp                                                { IfExp     { test ; thn ; els = None                                        } }
-| WHILE test = exp DO body = exp                                              { WhileExp  { test ; body                                                    } }
-| FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp                  { ForExp    { var ; escape = ref true ; lo ; hi ; body                       } }
+| var = var ASSIGN exp = exp                                                  { AssignExp { var ; exp }                                                      }
+| IF test = exp THEN thn = exp ELSE els = exp                                 { IfExp     { test ; thn ; els = Some els }                                    }
+| IF test = exp THEN thn = exp                                                { IfExp     { test ; thn ; els = None }                                        }
+| WHILE test = exp DO body = exp                                              { WhileExp  { test ; body }                                                    }
+| FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp                  { ForExp    { var ; escape = ref true ; lo ; hi ; body }                       }
 // TODO decl is not seperated by SEMECOLON
-| LET decls = separated_nonempty_list(SEMICOLON, decl) IN body = expseq END   { LetExp    { decls ; body                                                   } }
-| typ = sym_id size = subscript_exp OF init = exp                             { ArrayExp  { typ; size ; init                                               } }
+| LET decls = list(decl) IN body = expseq END                                 { LetExp    { decls ; body }                                                   }
+| typ = sym_id size = subscript_exp OF init = exp                             { ArrayExp  { typ; size ; init }                                               }
 
 expseq:
 | seq = separated_nonempty_list(SEMICOLON, exp) { (SeqExp seq) ^! $startpos}
 
 
 decl:
-| fundecldata = list(fundecldata)                            { FunctionDec fundecldata                                             }
+| FUNCTION fundecldata = list(fundecldata)                   { FunctionDec fundecldata                                             }
 | VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp { VarDec { name ; escape = ref true ; typ ; init ; pos = $startpos  } }
 | TYPE tydecldata = list(tydecldata)                         { TypeDec tydecldata                                                  }
 
 
 fundecldata:
-| FUNCTION name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
+| name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
 
 
 fielddata:
