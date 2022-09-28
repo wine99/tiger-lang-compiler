@@ -1,0 +1,7 @@
+let
+  function first():int = 0
+  function second():string = "test"
+  function third():int = 3
+in
+	0
+end

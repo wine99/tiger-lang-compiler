@@ -1,0 +1,13 @@
+LetExp([
+  FunctionDec[
+  | (first,[],
+  |   SOME(int),
+  |   IntExp(0)),
+  | (second,[],
+  |   SOME(string),
+  |   StringExp(\"test\")),
+  | (third,[],
+  |   SOME(int),
+  |   IntExp(3))]],
+  SeqExp[
+  | IntExp(0)])
