@@ -22,8 +22,7 @@
 
 (* Operator Precedence & Associativity *)
 %right ASSIGN
-%nonassoc DO
-%nonassoc THEN
+%nonassoc THEN DO
 %nonassoc ELSE
 %nonassoc OF
 %left OR AND
@@ -57,22 +56,45 @@ exp_base:
 | IF test = exp THEN thn = exp                                                { IfExp     { test ; thn ; els = None }                                        }
 | WHILE test = exp DO body = exp                                              { WhileExp  { test ; body }                                                    }
 | FOR var = sym_id ASSIGN lo = exp TO hi = exp DO body = exp                  { ForExp    { var ; escape = ref true ; lo ; hi ; body }                       }
-| LET decls = list(decl) IN body = expseq END                                 { LetExp    { decls ; body }                                                   }
+| LET decls = decls IN body = expseq END                                      { LetExp    { decls ; body }                                                   }
 | typ = sym_id size = subscript_exp OF init = exp                             { ArrayExp  { typ; size ; init }                                               }
 
 expseq:
 | seq = separated_nonempty_list(SEMICOLON, exp) { (SeqExp seq) ^! $startpos}
 
-decl:
-| FUNCTION fundecldata = separated_nonempty_list(FUNCTION, fundecldata) { FunctionDec fundecldata                                             }
-| VAR name = sym_id typ = opt_type_ascript ASSIGN init = exp            { VarDec { name ; escape = ref true ; typ ; init ; pos = $startpos  } }
-| TYPE tydecldata = separated_nonempty_list(TYPE, tydecldata)           { TypeDec tydecldata                                                  }
+decls:
+//| FUNCTION fundecldata = separated_nonempty_list(FUNCTION, fundecldata) { FunctionDec fundecldata                                          }
+| FUNCTION funcs = func funcTail = funcTail { FunctionDec funcs :: funcTail }
+| VAR varDecls = varDecls varTail = decls   { varDecls :: varTail }
+| TYPE tydecls = tydecls tyTail = tyTail    { TypeDec tydecls :: tyTail }
+| { [] }
+
+funcTail:
+| VAR varDecls = varDecls decls = decls     { varDecls :: decls }
+| TYPE tydecls = tydecls tyTail = tyTail    { TypeDec tydecls :: tyTail }
+| { [] }
+
+tyTail:
+| VAR varDecls = varDecls decls = decls     { varDecls :: decls }
+| FUNCTION funcs = func funcTail = funcTail { FunctionDec funcs :: funcTail }
+| { [] }
+
+func:
+| funfrac = fundecldata FUNCTION funcs = func { funfrac :: funcs }
+| funfrac = fundecldata                       { [funfrac] }
 
 fundecldata:
 | name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
 
 fielddata:
 | l = separated_list(COMMA, one_fielddata) { l }
+
+varDecls:
+| name = sym_id typ = opt_type_ascript ASSIGN init = exp { VarDec { name ; escape = ref true ; typ ; init ; pos = $startpos  } }
+
+tydecls:
+| tydecldata = tydecldata TYPE tydecls = tydecls { tydecldata :: tydecls }
+| tydecldata = tydecldata                        { [tydecldata] }
 
 tydecldata:
 | name = sym_id EQ ty = base_typ { Tdecl { name ; ty ; pos = $startpos } }
