@@ -37,7 +37,6 @@
 
 %%
 (* Expressions *)
-// TODO what does escape do
 exp_base:
 | v = var                                                                     { VarExp v                                                                     }
 | i = INT                                                                     { IntExp i                                                                     }
@@ -60,28 +59,27 @@ exp_base:
 | typ = sym_id size = subscript_exp OF init = exp                             { ArrayExp  { typ; size ; init }                                               }
 
 expseq:
-| seq = separated_nonempty_list(SEMICOLON, exp) { (SeqExp seq) ^! $startpos}
+| seq = separated_nonempty_list(SEMICOLON, exp) { (SeqExp seq) ^! $startpos }
 
 decls:
-//| FUNCTION fundecldata = separated_nonempty_list(FUNCTION, fundecldata) { FunctionDec fundecldata                                          }
 | FUNCTION funcs = func funcTail = funcTail { FunctionDec funcs :: funcTail }
-| VAR varDecls = varDecls varTail = decls   { varDecls :: varTail }
-| TYPE tydecls = tydecls tyTail = tyTail    { TypeDec tydecls :: tyTail }
-| { [] }
+| VAR varDecls = varDecls varTail = decls   { varDecls :: varTail           }
+| TYPE tydecls = tydecls tyTail = tyTail    { TypeDec tydecls :: tyTail     }
+|                                           { []                            }
 
 funcTail:
-| VAR varDecls = varDecls decls = decls     { varDecls :: decls }
+| VAR varDecls = varDecls decls = decls     { varDecls :: decls         }
 | TYPE tydecls = tydecls tyTail = tyTail    { TypeDec tydecls :: tyTail }
 | { [] }
 
 tyTail:
-| VAR varDecls = varDecls decls = decls     { varDecls :: decls }
+| VAR varDecls = varDecls decls = decls     { varDecls :: decls             }
 | FUNCTION funcs = func funcTail = funcTail { FunctionDec funcs :: funcTail }
 | { [] }
 
 func:
 | funfrac = fundecldata FUNCTION funcs = func { funfrac :: funcs }
-| funfrac = fundecldata                       { [funfrac] }
+| funfrac = fundecldata                       { [funfrac]        }
 
 fundecldata:
 | name = sym_id LPAREN params = fielddata RPAREN result = opt_type_ascript EQ body = exp { Fdecl { name ; params ; result ; body ; pos = $startpos } }
@@ -94,7 +92,7 @@ varDecls:
 
 tydecls:
 | tydecldata = tydecldata TYPE tydecls = tydecls { tydecldata :: tydecls }
-| tydecldata = tydecldata                        { [tydecldata] }
+| tydecldata = tydecldata                        { [tydecldata]          }
 
 tydecldata:
 | name = sym_id EQ ty = base_typ { Tdecl { name ; ty ; pos = $startpos } }
@@ -117,8 +115,8 @@ var:
 | id = sym_id tail = var_tail { makeLvaluePartSpec ((SimpleVar id) ^@ $startpos) $startpos tail }
 
 var_tail:
-|                                       { [] }
-| DOT v = sym_id tail = var_tail        { (FieldPart v) :: tail }
+|                                       { []                        }
+| DOT v = sym_id tail = var_tail        { (FieldPart v) :: tail     }
 | LBRACK e = exp RBRACK tail = var_tail { (SubscriptPart e) :: tail }
 
 record_field:
