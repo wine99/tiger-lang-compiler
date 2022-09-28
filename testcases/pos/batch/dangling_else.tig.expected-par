@@ -1,12 +1,25 @@
 LetExp([
-  VarDec(x, true, NONE,
+  VarDec(x,true,NONE,
   | IntExp(1)),
-  VarDec(y, true, NONE,
-  | IntExp(0)),
+  VarDec(y,true,NONE,
+  | IntExp(0))],
   SeqExp[
-    IfExp(
-      OpExp(SimpleVar(x), EqOp, IntExp(0)),
-      IfExp
-      )
-  ]
-])
+  | IfExp(
+  |   OpExp(EqOp,
+  |   | VarExp(
+  |   |   SimpleVar(x)),
+  |   | IntExp(0)),
+  |   IfExp(
+  |   | OpExp(EqOp,
+  |   |   VarExp(
+  |   |   | SimpleVar(y)),
+  |   |   IntExp(0)),
+  |   | CallExp(print,[
+  |   |   VarExp(
+  |   |   | SimpleVar(y))]),
+  |   | CallExp(print,[
+  |   |   OpExp(PlusOp,
+  |   |   | VarExp(
+  |   |   |   SimpleVar(x)),
+  |   |   | VarExp(
+  |   |   |   SimpleVar(y)))])))])
