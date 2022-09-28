@@ -22,9 +22,9 @@
 
 (* Operator Precedence & Associativity *)
 %right ASSIGN
+%nonassoc DO
 %nonassoc THEN
 %nonassoc ELSE
-%nonassoc DO
 %nonassoc OF
 %left OR AND
 %nonassoc EQ NEQ LT LE GT GE
