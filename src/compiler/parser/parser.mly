@@ -88,18 +88,16 @@ program: e = exp EOF { e }
 exp:
 | e = exp_base  { e ^! $startpos }
 
-(* Variables *)
-var_base:
-| id = sym_id                  { SimpleVar    id      }
-| v = var DOT id = sym_id      { FieldVar     (v, id) }
-| v = sym_id e = subscript_exp { SubscriptVar ((SimpleVar v) ^@ $startpos, e ) }
-| v = var e = subscript_exp    { SubscriptVar (v, e ) }
-
 subscript_exp:
 | LBRACK e = exp RBRACK { e }
 
 var:
-| v = var_base { v ^@ $startpos }
+| id = sym_id tail = var_tail { makeLvaluePartSpec ((SimpleVar id) ^@ $startpos) $startpos tail }
+
+var_tail:
+|                                       { [] }
+| DOT v = sym_id tail = var_tail        { (FieldPart v) :: tail }
+| LBRACK e = exp RBRACK tail = var_tail { (SubscriptPart e) :: tail }
 
 record_field:
 | symbol = sym_id EQ exp = exp { (symbol, exp) }
