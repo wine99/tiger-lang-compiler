@@ -623,6 +623,18 @@
         ]
     },
     {
+        "file": "pos/batch/dangling_else.tig",
+        "feature-sets": [
+            "lex0",
+            "lex2",
+            "llvm0",
+            "par0",
+            "sem0",
+            "xasm1",
+            "xasm2"
+        ]
+    },
+    {
         "file": "pos/batch/ddd.tig",
         "feature-sets": [
             "lex0",
