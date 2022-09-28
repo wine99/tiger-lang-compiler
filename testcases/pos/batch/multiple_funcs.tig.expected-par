@@ -5,7 +5,7 @@ LetExp([
   |   IntExp(0)),
   | (second,[],
   |   SOME(string),
-  |   StringExp(\"test\")),
+  |   StringExp("test")),
   | (third,[],
   |   SOME(int),
   |   IntExp(3))]],
