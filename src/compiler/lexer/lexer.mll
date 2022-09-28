@@ -34,8 +34,6 @@
 
 }
 
-
-
 let whitespace = [' ' '\t']
 let digits = ['0' - '9']+
 let small_letters = ['a' - 'z']
@@ -113,8 +111,6 @@ and str start_pos acc = parse
 | '\n'   { error lexbuf "Unclosed string"                                                  }
 | eof    { error lexbuf "Unclosed string"                                                  }
 | _ as c { str start_pos (printable_char acc c lexbuf) lexbuf                              }
-
-
 
 and escape_character = parse
 | eof            { error lexbuf "Reached end of file in ecsape character." }
