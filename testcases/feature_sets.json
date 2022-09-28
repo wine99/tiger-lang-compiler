@@ -884,6 +884,18 @@
         ]
     },
     {
+        "file": "pos/batch/nested_while2.tig",
+        "feature-sets": [
+            "lex0",
+            "lex2",
+            "llvm0",
+            "llvm2",
+            "par0",
+            "par1",
+            "par2"
+        ]
+    },
+    {
         "file": "pos/batch/nil_seq_last_ok.tig",
         "feature-sets": [
             "lex0",
