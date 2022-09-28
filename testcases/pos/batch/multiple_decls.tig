@@ -1,0 +1,11 @@
+let
+  type a = {x: b}
+  type b = a
+  function first():int = second()
+  function second():int = first()
+  var  x := first
+  var  y := second
+  type c = b
+in
+	0
+end
