@@ -1,8 +1,0 @@
-let
-  var x : int := 0
-  var y : int := 1
-in
-  if x = 0 then print ( x )
-  if y = 0 then print ( y )
-  else print( x + y )
-end
