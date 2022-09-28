@@ -868,12 +868,19 @@
             "llvm2",
             "par0",
             "par1",
-            "par2",
-            "sem0",
-            "sem2",
-            "xasm1",
-            "xasm2",
-            "xasm3"
+            "par2"
+        ]
+    },
+    {
+        "file": "pos/batch/nested_while.tig",
+        "feature-sets": [
+            "lex0",
+            "lex2",
+            "llvm0",
+            "llvm2",
+            "par0",
+            "par1",
+            "par2"
         ]
     },
     {
