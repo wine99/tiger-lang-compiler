@@ -860,6 +860,23 @@
         ]
     },
     {
+        "file": "pos/batch/multi_level_comment.tig",
+        "feature-sets": [
+            "lex0",
+            "lex2",
+            "llvm0",
+            "llvm2",
+            "par0",
+            "par1",
+            "par2",
+            "sem0",
+            "sem2",
+            "xasm1",
+            "xasm2",
+            "xasm3"
+        ]
+    },
+    {
         "file": "pos/batch/nil_seq_last_ok.tig",
         "feature-sets": [
             "lex0",
