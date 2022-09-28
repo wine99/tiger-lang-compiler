@@ -42,7 +42,6 @@ let letter = small_letters | big_letters
 let id = letter+ (letter | digits | '_')*
 let illegal_id = digits (letter | '_')+
 let ascii_digit = ['0' - '9']['0' - '9']['0' - '9']
-let caret_letters = ['a' - 'g'] | ['k' - 'l'] | ['n' - 'z']
 
 (** The main entrypoint for the lexer *)
 rule token = parse
@@ -125,10 +124,6 @@ and escape_character = parse
 | 't'            { "\t" }
 | 'n'            { "\n" }
 | 'r'            { "\r" }
-| "^h"           { "\b" }
-| "^i"           { "\t" }
-| "^j"           { "\n" }
-| "^m"           { "\r" }
 | '^'            { String.make 1 (Char.chr (caret_notation lexbuf))               }
 | ascii_digit    { ascii_digit_range (int_of_string(Lexing.lexeme lexbuf)) lexbuf }
 | _              { error lexbuf "Invalid escape character"                        }
@@ -143,7 +138,7 @@ and caret_notation = parse
 | '_'                { 31  }
 | '?'                { 127 }
 | big_letters   as b { (Char.code (b)) - 64 }
-| caret_letters as s { (Char.code (s)) - 96 }
+| small_letters as s { (Char.code (s)) - 96 }
 | _                  { error lexbuf "Invalid escape character" }
 
 and back_seq = parse
