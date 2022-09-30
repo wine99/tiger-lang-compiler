@@ -59,7 +59,7 @@ exp_base:
 | typ = sym_id size = subscript_exp OF init = exp                             { ArrayExp  { typ; size ; init }                                               }
 
 expseq:
-| seq = separated_nonempty_list(SEMICOLON, exp) { (SeqExp seq) ^! $startpos }
+| seq = separated_list(SEMICOLON, exp) { (SeqExp seq) ^! $startpos }
 
 decls:
 | FUNCTION funcs = func funcTail = funcTail { FunctionDec funcs :: funcTail }
