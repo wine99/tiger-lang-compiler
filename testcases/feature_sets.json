@@ -1,5 +1,11 @@
 [
     {
+        "file": "neg/lex/escape_fail.tig",
+        "feature-sets": [
+            "lex0"
+        ]
+    },
+    {
         "file": "neg/lex/123abc.tig",
         "feature-sets": [
             "lex0"
