@@ -25,7 +25,8 @@
 %nonassoc THEN DO
 %nonassoc ELSE
 %nonassoc OF
-%left OR AND
+%left OR
+%left AND
 %nonassoc EQ NEQ LT LE GT GE
 %left PLUS MINUS
 %left TIMES DIVIDE
