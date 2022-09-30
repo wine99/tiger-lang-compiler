@@ -63,17 +63,17 @@ expseq:
 
 decls:
 | FUNCTION funcs = func funcTail = funcTail { FunctionDec funcs :: funcTail }
-| VAR varDecls = varDecls varTail = decls   { varDecls :: varTail           }
+| VAR varDecl = varDecl varTail = decls     { varDecl :: varTail            }
 | TYPE tydecls = tydecls tyTail = tyTail    { TypeDec tydecls :: tyTail     }
 |                                           { []                            }
 
 funcTail:
-| VAR varDecls = varDecls decls = decls     { varDecls :: decls         }
+| VAR varDecl = varDecl decls = decls       { varDecl :: decls          }
 | TYPE tydecls = tydecls tyTail = tyTail    { TypeDec tydecls :: tyTail }
 | { [] }
 
 tyTail:
-| VAR varDecls = varDecls decls = decls     { varDecls :: decls             }
+| VAR varDecl = varDecl decls = decls       { varDecl :: decls              }
 | FUNCTION funcs = func funcTail = funcTail { FunctionDec funcs :: funcTail }
 | { [] }
 
@@ -87,7 +87,7 @@ fundecldata:
 fielddata:
 | l = separated_list(COMMA, one_fielddata) { l }
 
-varDecls:
+varDecl:
 | name = sym_id typ = opt_type_ascript ASSIGN init = exp { VarDec { name ; escape = ref true ; typ ; init ; pos = $startpos  } }
 
 tydecls:
