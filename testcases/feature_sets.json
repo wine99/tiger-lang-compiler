@@ -910,10 +910,6 @@
     {
         "file": "pos/batch/nested_while2.tig",
         "feature-sets": [
-            "lex0",
-            "lex2",
-            "llvm0",
-            "llvm2",
             "par0",
             "par1",
             "par2"
