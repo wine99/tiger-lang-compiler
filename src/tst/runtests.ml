@@ -13,7 +13,7 @@
 
 let defaultPhasesToCheck =
   let open TestPhases in
-  [LEX; PAR]
+  [SEM]
 
 (* obs: for student code the above list must correspond to only one phase *)
 

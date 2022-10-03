@@ -7,9 +7,11 @@
 open Tigercommon
 open Tigerlexer
 open Tigerparser
+open Tigersemant
 open Phases
 open ExitCodes
 module A = Absyn
+module A' = Tabsyn
 module S = Symbol
 
 type config =
@@ -65,20 +67,22 @@ let parse file =
   in
   close_in input ; parseRes
 
-(* Our reference compiler should allow for stopping at different phases
-   in the compilation and allow us to pick the right backend. We implement
-   this using a straightforward command-line parsing/checking *)
+let semant exp =
+  let texp, err = Semant.transProg exp in
+  if Errenv.any_errors err then raise (ExitMain SEM) ;
+  texp
 
 (* --- command-line checking; dispatching to the right phase --- *)
 
 (* observe that we make sure that exit flags are raised upon
    invalid return from each phase *)
-let tiger {file; phase; out; _} =
+let tiger {file; phase; unfold; out; _} =
   let exitCode = ref 0 in
   ( try
       match phase with
       | LEX -> lexonly file out
       | PAR -> file |> parse |> Prabsyn.print_exp out
+      | SEM -> file |> parse |> semant |> Prtabsyn.print_exp unfold out
       | _ -> failwith "Phase not implemented"
     with ExitMain p -> exitCode := error_code p ) ;
   Format.pp_print_flush out () ;
@@ -127,7 +131,7 @@ let phase_arg =
     "Compile to $(docv). The value $(docv) must be " ^ Arg.doc_alts_enum ls
     ^ ". Ignored if $(b,language) is $(b,llvm)."
   in
-  Arg.(value & opt (enum ls) PAR & info ["p"; "phase"] ~docv:"PHASE" ~doc)
+  Arg.(value & opt (enum ls) SEM & info ["p"; "phase"] ~docv:"PHASE" ~doc)
 
 let unfold_arg =
   let doc = "Unfold name-types $(docv) levels when pretty-printing." in
