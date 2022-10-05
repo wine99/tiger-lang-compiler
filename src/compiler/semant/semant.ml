@@ -40,96 +40,105 @@ let rec transExp ({err; venv; tenv} : context) e =
       | None ->
           Err.error err pos (EFmt.errorFunctionUndefined func) ;
           err_exp pos
-      | Some tFunc -> call_exp func tFunc args pos
-    )
+      | Some tFunc -> call_exp func tFunc args pos )
     | OpExp {left; oper; right} ->
-      let t_left = (trexp left) in
-      let t_right = (trexp right) in (
+        let t_left = trexp left in
+        let t_right = trexp right in
         (* raise errorArith if not int *)
         (* match t_left with
-        |
-        check_type t_left INT EFmt.errorArith ;
-        check_type t_right INT EFmt.errorArith ; *)
-        TA.Exp { exp_base = TA.OpExp { left = t_left ; oper ; right = t_right } ; pos ; ty = INT }
-      )
+           |
+           check_type t_left INT EFmt.errorArith ;
+           check_type t_right INT EFmt.errorArith ; *)
+        TA.Exp
+          { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
+          ; pos
+          ; ty= INT }
     (* | RecordExp {field; typ} ->
-      match S.look (tenv, typ) with
-      | None -> Err.error err pos (EFmt.errorTypeDoesNotExist)
-                err_exp pos
-      | Some typ ->
-       *)
-    | IfExp { test ; thn ; els } -> raise NotImplemented
+       match S.look (tenv, typ) with
+       | None -> Err.error err pos (EFmt.errorTypeDoesNotExist)
+                 err_exp pos
+       | Some typ ->
+    *)
+    | IfExp {test; thn; els} -> raise NotImplemented
     | _ -> raise NotImplemented
-
   (* Compute an error expression. *)
   and err_exp pos = TA.Exp {exp_base= TA.ErrorExp; pos; ty= Ty.ERROR}
-
   (* Helper function for call expression. *)
-  and call_exp func tFunc args pos = (
+  and call_exp func tFunc args pos =
     (* Match the types of the function. *)
     match tFunc with
     | FunEntry {formals; result} ->
         if List.length args != List.length formals then (
           Err.error err pos (EFmt.errorFunctionArguments func) ;
           err_exp pos )
-        else (
+        else
           (* Check if arguments have correct type *)
           let typeCheckArgs = List.map (fun x -> trexp x) args in
-          let argTypes = List.map (
-            fun x ->
-              match x with
-              | TA.Exp { ty ; _ } -> ty
-          ) typeCheckArgs in
+          let argTypes =
+            List.map
+              (fun x -> match x with TA.Exp {ty; _} -> ty)
+              typeCheckArgs
+          in
           (* Check types of arguments are the same as specified for function. *)
-          if List.equal (fun x y -> x == y) argTypes formals then (
-            TA.Exp { exp_base = TA.CallExp { func ; args = typeCheckArgs } ; pos ; ty = result }
-          )
+          if List.equal (fun x y -> x == y) argTypes formals then
+            TA.Exp
+              { exp_base= TA.CallExp {func; args= typeCheckArgs}
+              ; pos
+              ; ty= result }
           else (
             (* Arguments did not match specified types. *)
-            Err.error err pos (EFmt.errorFunctionArguments func) (* This should probably be another error... *) ;
-            err_exp pos
-          )
-        )
+            Err.error err pos (EFmt.errorFunctionArguments func)
+            (* This should probably be another error... *) ;
+            err_exp pos )
     | _ ->
         Err.error err pos (EFmt.errorUsingVariableAsFunction func) ;
-        err_exp pos )
-
+        err_exp pos
   and trvar (A.Var {var_base; pos}) : TA.var =
     match var_base with
     (* Simple var i.e. `x` *)
     | A.SimpleVar s -> (
-      match S.look (venv, s) with (* Look up the symbol s in venv *)
-      | None -> (* Error, it does not exists *)
+      match S.look (venv, s) with
+      (* Look up the symbol s in venv *)
+      | None ->
+          (* Error, it does not exists *)
           Err.error err pos (EFmt.errorVariableUndefined s) ;
           TA.Var {var_base= TA.SimpleVar s; pos; ty= Ty.ERROR}
       | Some ent -> (
         match ent with
         | VarEntry ty -> TA.Var {var_base= TA.SimpleVar s; pos; ty}
-        | FunEntry _ -> (*  *)
-            Err.error err pos (EFmt.errorUsingFunctionAsVariable s)
-            ; TA.Var {var_base= TA.SimpleVar s; pos; ty= Ty.ERROR} ) )
-
+        | FunEntry _ ->
+            (*  *)
+            Err.error err pos (EFmt.errorUsingFunctionAsVariable s) ;
+            TA.Var {var_base= TA.SimpleVar s; pos; ty= Ty.ERROR} ) )
     (* FieldVar, i.e. `record.field` *)
     | A.FieldVar (v, s) -> (
         (* Type check the base variable v *)
-        let (TA.Var {var_base = vb; pos = p; ty = tpe}) = trvar v in
+        let (TA.Var {var_base= vb; pos= p; ty= tpe}) = trvar v in
         match actual_type err p tpe with
-        | RECORD (fields, _) -> ( (* Check that symbol s exists in record fields *)
+        | RECORD (fields, _) -> (
+          (* Check that symbol s exists in record fields *)
           match List.assoc_opt s fields with
-          | Some t -> TA.Var { var_base = TA.FieldVar (TA.Var {var_base = vb; pos = p; ty = tpe}, s) ; pos ; ty = t}
-          | None   ->
-            Err.error err p (EFmt.errorRecordNonExistingField s tpe)
-            ; TA.Var { var_base = TA.FieldVar (TA.Var {var_base = vb; pos = p; ty = tpe}, s) ; pos ; ty = Ty.ERROR }
-        )
-
-        | t -> (* Actual type of the variable v was not a record *)
+          | Some t ->
+              TA.Var
+                { var_base=
+                    TA.FieldVar (TA.Var {var_base= vb; pos= p; ty= tpe}, s)
+                ; pos
+                ; ty= t }
+          | None ->
+              Err.error err p (EFmt.errorRecordNonExistingField s tpe) ;
+              TA.Var
+                { var_base=
+                    TA.FieldVar (TA.Var {var_base= vb; pos= p; ty= tpe}, s)
+                ; pos
+                ; ty= Ty.ERROR } )
+        | t ->
+            (* Actual type of the variable v was not a record *)
             Err.error err pos (EFmt.errorRecordType t) ;
             TA.Var
-              { var_base= TA.FieldVar (TA.Var {var_base = vb; pos = p; ty = tpe}, s)
+              { var_base=
+                  TA.FieldVar (TA.Var {var_base= vb; pos= p; ty= tpe}, s)
               ; pos
-              ; ty= Ty.ERROR }
-              )
-
+              ; ty= Ty.ERROR } )
     (* SubscriptVar i.e. `arr[i]` *)
     | A.SubscriptVar (v, e) -> raise NotImplemented
   in
