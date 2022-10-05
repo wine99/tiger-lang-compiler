@@ -25,7 +25,7 @@ exception NotImplemented
 open Ty
 
 let rec transExp ({err; venv; tenv} : context) e =
-  let rec trexp (A.Exp {exp_base; pos}) : Tabsyn.exp =
+  let rec trexp (A.Exp {exp_base; pos}) : TA.exp =
     match exp_base with
     | VarExp var -> (
         let tvar = trvar var in
@@ -42,27 +42,31 @@ let rec transExp ({err; venv; tenv} : context) e =
           err_exp pos
       | Some tFunc -> call_exp func tFunc args pos )
     | OpExp {left; oper; right} ->
-        let t_left = trexp left in
-        let t_right = trexp right in
-        (* raise errorArith if not int *)
-        (* match t_left with
-           |
-           check_type t_left INT EFmt.errorArith ;
-           check_type t_right INT EFmt.errorArith ; *)
+        let t_left = check_type (trexp left) INT EFmt.errorArith in
+        let t_right = check_type (trexp right) INT EFmt.errorArith in
         TA.Exp
           { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
           ; pos
           ; ty= INT }
-    (* | RecordExp {field; typ} ->
+    (* | RecordExp {fields; typ} -> (
        match S.look (tenv, typ) with
-       | None -> Err.error err pos (EFmt.errorTypeDoesNotExist)
-                 err_exp pos
-       | Some typ ->
-    *)
-    | IfExp {test; thn; els} -> raise NotImplemented
+       | None -> ( Err.error err pos (EFmt.errorTypeDoesNotExist typ) ;
+                   err_exp pos )
+       | Some type_rec ->
+          match actual_type err pos type_rec with
+          | RECORD (fields = t_fileds; _) ->
+          | _ -> raise NotImplemented ) *)
+    | IfExp {test; thn; els} -> if_exp test thn els pos
     | _ -> raise NotImplemented
   (* Compute an error expression. *)
   and err_exp pos = TA.Exp {exp_base= TA.ErrorExp; pos; ty= Ty.ERROR}
+  and check_type t_exp expected_t err_type =
+    match t_exp with
+    | TA.Exp {ty; pos; _} ->
+        if ty = expected_t then t_exp
+        else (
+          Err.error err pos err_type ;
+          err_exp pos )
   (* Helper function for call expression. *)
   and call_exp func tFunc args pos =
     (* Match the types of the function. *)
@@ -93,6 +97,45 @@ let rec transExp ({err; venv; tenv} : context) e =
     | _ ->
         Err.error err pos (EFmt.errorUsingVariableAsFunction func) ;
         err_exp pos
+  and if_exp test thn els pos =
+    (* Type check test and then. *)
+    let (TA.Exp {ty= testTy; _} as evalTest) = trexp test in
+    let (TA.Exp {ty= thnTy; _} as evalThn) = trexp thn in
+    (* Check test *)
+    if testTy == Ty.INT then
+      (* Test is INT. *)
+      (* Check if there exists an else statement. *)
+      match els with
+      | None ->
+          if (* No else statement. *)
+             thnTy == Ty.VOID then
+            (* Correct thn-body type. *)
+            TA.Exp
+              { exp_base= TA.IfExp {test= evalTest; thn= evalThn; els= None}
+              ; pos
+              ; ty= thnTy }
+          else (
+            (* Thn-body is not void. *)
+            Err.error err pos (EFmt.errorIfThenShouldBeVoid thnTy) ;
+            err_exp pos )
+      | Some elseSt ->
+          (* With else statement. *)
+          let (TA.Exp {ty= elsTy; _} as evalEls) = trexp elseSt in
+          if thnTy == elsTy then
+            (* Same return type for then and else. *)
+            TA.Exp
+              { exp_base=
+                  TA.IfExp {test= evalTest; thn= evalThn; els= Some evalEls}
+              ; pos
+              ; ty= elsTy }
+          else (
+            (* Not same return type for then and else. *)
+            Err.error err pos (EFmt.errorIfBranchesNotSameType thnTy elsTy) ;
+            err_exp pos )
+    else (
+      (* Test is not INT. *)
+      Err.error err pos (EFmt.errorIntRequired testTy) ;
+      err_exp pos )
   and trvar (A.Var {var_base; pos}) : TA.var =
     match var_base with
     (* Simple var i.e. `x` *)
@@ -113,34 +156,42 @@ let rec transExp ({err; venv; tenv} : context) e =
     (* FieldVar, i.e. `record.field` *)
     | A.FieldVar (v, s) -> (
         (* Type check the base variable v *)
-        let (TA.Var {var_base= vb; pos= p; ty= tpe}) = trvar v in
+        let (TA.Var {pos= p; ty= tpe; _} as tv) = trvar v in
         match actual_type err p tpe with
         | RECORD (fields, _) -> (
           (* Check that symbol s exists in record fields *)
           match List.assoc_opt s fields with
-          | Some t ->
-              TA.Var
-                { var_base=
-                    TA.FieldVar (TA.Var {var_base= vb; pos= p; ty= tpe}, s)
-                ; pos
-                ; ty= t }
+          | Some t -> TA.Var {var_base= TA.FieldVar (tv, s); pos; ty= t}
           | None ->
               Err.error err p (EFmt.errorRecordNonExistingField s tpe) ;
-              TA.Var
-                { var_base=
-                    TA.FieldVar (TA.Var {var_base= vb; pos= p; ty= tpe}, s)
-                ; pos
-                ; ty= Ty.ERROR } )
+              TA.Var {var_base= TA.FieldVar (tv, s); pos; ty= Ty.ERROR} )
         | t ->
             (* Actual type of the variable v was not a record *)
             Err.error err pos (EFmt.errorRecordType t) ;
-            TA.Var
-              { var_base=
-                  TA.FieldVar (TA.Var {var_base= vb; pos= p; ty= tpe}, s)
-              ; pos
-              ; ty= Ty.ERROR } )
+            TA.Var {var_base= TA.FieldVar (tv, s); pos; ty= Ty.ERROR} )
     (* SubscriptVar i.e. `arr[i]` *)
-    | A.SubscriptVar (v, e) -> raise NotImplemented
+    | A.SubscriptVar (v, e) -> (
+        (* Type check the base variable v *)
+        let (TA.Var {pos= p; ty= tpe; _} as tv) = trvar v in
+        let (TA.Exp {pos= ep; ty= etyp; _} as texp) = trexp e in
+        (* Check that the actualy type is an array *)
+        match (actual_type err p tpe, etyp) with
+        | ARRAY (t, _), INT ->
+            TA.Var {var_base= TA.SubscriptVar (tv, texp); pos; ty= t}
+        | t, INT ->
+            (* Error, actual type of var was not an array *)
+            Err.error err p (EFmt.errorArrayType t) ;
+            TA.Var {var_base= TA.SubscriptVar (tv, texp); pos; ty= Ty.ERROR}
+        | ARRAY (_, _), et ->
+            (* Error, actual type of exp was not an int *)
+            Err.error err ep (EFmt.errorIntRequired et) ;
+            TA.Var {var_base= TA.SubscriptVar (tv, texp); pos; ty= Ty.ERROR}
+        | t, et ->
+            (* Error, actual type of var was not array and actual type of exp was not int (combination of both) *)
+            Err.error err p (EFmt.errorArrayType t) ;
+            Err.error err ep (EFmt.errorIntRequired et) ;
+            TA.Var {var_base= TA.SubscriptVar (tv, texp); pos; ty= Ty.ERROR}
+        )
   in
   trexp e
 
