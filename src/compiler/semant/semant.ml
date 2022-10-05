@@ -76,6 +76,21 @@ let rec transExp ({err; venv; tenv; break} : context) e =
           )
           | _ -> raise NotImplemented
        )) *)
+    | SeqExp exps -> (
+      let rec t_exp = function
+        | [] -> [], Ty.VOID
+        | [exp] -> (
+          let (TA.Exp {ty ; _} as t_exp) = trexp exp in
+          [t_exp], ty
+        )
+        | exp :: exps -> (
+          let (t_exps, ty) = t_exp exps in
+          trexp exp :: t_exps, ty
+        )
+      in
+      let (t_exps, ty) = t_exp exps in
+      TA.Exp { exp_base = TA.SeqExp t_exps ; pos ; ty}
+    )
     | A.IfExp {test; thn; els} -> if_exp test thn els pos
     | A.WhileExp {test; body} -> (
         let (TA.Exp {ty= testTy; _} as t_test) = trexp test in
