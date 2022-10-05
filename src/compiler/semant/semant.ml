@@ -95,17 +95,17 @@ let rec transExp ({err; venv; tenv; break} : context) e =
         | _ ->
             Err.error err pos (EFmt.errorIntRequired testTy) ;
             err_exp pos )
-    (*| ForExp {var; escape; lo; hi; body} -> (
+    | ForExp {var; escape; lo; hi; body} -> (
           let (TA.Exp {ty = loTy ; _} as t_lo) = trexp lo in
           let (TA.Exp {ty = hiTy ; _} as t_hi) = trexp hi in
           match (loTy, hiTy) with
           | (Ty.INT, Ty.INT) -> (
-            let (TA.Exp {ty=bodyTy;_} as t_body) = transExp {err; venv (*UPDATE*);tenv; break= true}
+            let (TA.Exp {ty=bodyTy;_} as t_body) = transExp {err; venv = (S.enter (venv, var, (E.VarEntry Ty.INT))) ; tenv; break= true} body in
+            raise NotImplemented
           )
-          | (Ty.INT, _     ) -> Err.error err pos (EFmt.errorIntRequired hiTy)
-          | _                -> Err.error err pos (EFmt.errorIntRequired loTy)
+          | (Ty.INT, _     ) -> Err.error err pos (EFmt.errorIntRequired hiTy); err_exp pos
+          | _                -> Err.error err pos (EFmt.errorIntRequired loTy); err_exp pos
       )
-    *)
     | A.BreakExp ->
         if break then TA.Exp {exp_base= BreakExp; pos; ty= Ty.VOID}
         else (
