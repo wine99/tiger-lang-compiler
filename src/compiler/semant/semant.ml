@@ -116,6 +116,7 @@ let rec transExp ({err; venv; tenv; break} : context) e =
         else (
           Err.error err pos EFmt.errorBreak ;
           err_exp pos )
+    | A.LetExp {decls ; body} when decls = [] -> trexp body
     | _ -> raise NotImplemented
   (* Compute an error expression. *)
   and err_exp pos = TA.Exp {exp_base= TA.ErrorExp; pos; ty= Ty.ERROR}
