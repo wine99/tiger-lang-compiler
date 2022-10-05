@@ -101,7 +101,12 @@ let rec transExp ({err; venv; tenv; break} : context) e =
           match (loTy, hiTy) with
           | (Ty.INT, Ty.INT) -> (
             let (TA.Exp {ty=bodyTy;_} as t_body) = transExp {err; venv = (S.enter (venv, var, (E.VarEntry Ty.INT))) ; tenv; break= true} body in
-            raise NotImplemented
+            if bodyTy == Ty.VOID then
+              TA.Exp { exp_base = ForExp { var ; escape ; lo = t_lo ; hi = t_hi ; body = t_body } ; pos ; ty = bodyTy }
+            else (
+              Err.error err pos (EFmt.errorForShouldBeVoid bodyTy);
+              err_exp pos
+            )
           )
           | (Ty.INT, _     ) -> Err.error err pos (EFmt.errorIntRequired hiTy); err_exp pos
           | _                -> Err.error err pos (EFmt.errorIntRequired loTy); err_exp pos
