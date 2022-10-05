@@ -30,7 +30,7 @@ let rec transExp ({err; venv; tenv} : context) e =
     | A.IntExp i -> TA.Exp {exp_base= TA.IntExp i; pos; ty= Ty.INT}
     | A.StringExp s -> TA.Exp {exp_base= TA.StringExp s; pos; ty= Ty.STRING}
     | A.NilExp -> TA.Exp {exp_base= TA.NilExp; pos; ty= Ty.NIL}
-    | A.SeqExp [] -> TA.Exp {exp_base= TA.SeqExp []; pos ; ty = Ty.VOID}
+    | A.SeqExp [] -> TA.Exp {exp_base= TA.SeqExp []; pos; ty= Ty.VOID}
     | VarExp var -> (
         let tvar = trvar var in
         match tvar with
@@ -58,28 +58,25 @@ let rec transExp ({err; venv; tenv} : context) e =
           | RECORD (fields = t_fileds; _) ->
           | _ -> raise NotImplemented ) *)
     | A.IfExp {test; thn; els} -> if_exp test thn els pos
-    | A.WhileExp {test ; body} -> (
-      let TA.Exp { ty = testTy ; _ } as evalTest = trexp test in
-      let TA.Exp { ty = bodyTy ; _ } as evalBody = trexp body in
-      if testTy == Ty.INT then (
-        (* Test has correct type. *)
-        if bodyTy == Ty.VOID then (
-          (* Body has correct return type. *)
-          TA.Exp { exp_base = TA.WhileExp { test = evalTest ; body = evalBody } ; pos ; ty = bodyTy }
-          (* ---------- TODO : break = true ----------- *)
-        )
+    | A.WhileExp {test; body} ->
+        let (TA.Exp {ty= testTy; _} as evalTest) = trexp test in
+        let (TA.Exp {ty= bodyTy; _} as evalBody) = trexp body in
+        if testTy == Ty.INT then
+          if (* Test has correct type. *)
+             bodyTy == Ty.VOID then
+            (* Body has correct return type. *)
+            TA.Exp
+              { exp_base= TA.WhileExp {test= evalTest; body= evalBody}
+              ; pos
+              ; ty= bodyTy } (* ---------- TODO : break = true ----------- *)
+          else (
+            (* Body should have returned type VOID. *)
+            Err.error err pos (EFmt.errorWhileShouldBeVoid bodyTy) ;
+            err_exp pos )
         else (
-          (* Body should have returned type VOID. *)
-          Err.error err pos (EFmt.errorWhileShouldBeVoid bodyTy);
-          err_exp pos
-        )
-      )
-      else (
-        (* Test should have had type int. *)
-        Err.error err pos (EFmt.errorIntRequired testTy);
-        err_exp pos
-      )
-    )
+          (* Test should have had type int. *)
+          Err.error err pos (EFmt.errorIntRequired testTy) ;
+          err_exp pos )
     | _ -> raise NotImplemented
   (* Compute an error expression. *)
   and err_exp pos = TA.Exp {exp_base= TA.ErrorExp; pos; ty= Ty.ERROR}
@@ -219,8 +216,7 @@ let rec transExp ({err; venv; tenv} : context) e =
   trexp e
 
 and transDecl ({err; venv; tenv} : context) dec =
-  match dec with
-  | _ -> raise NotImplemented
+  match dec with _ -> raise NotImplemented
 
 and actual_type err pos = function
   | NAME (sym, opt_ty_ref) -> (
