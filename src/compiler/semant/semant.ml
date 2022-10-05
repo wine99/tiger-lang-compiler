@@ -17,6 +17,7 @@ module TA = Tabsyn
 type context =
   { venv: E.enventry S.table (* Γ from our formal typing rules *)
   ; tenv: Ty.ty S.table (* Δ from our formal typing rules *)
+  ; break: bool (* β from our formal typing rules *)
   ; err: Err.errenv (* error environment *) }
 
 exception NotImplemented
@@ -24,7 +25,7 @@ exception NotImplemented
 
 open Ty
 
-let rec transExp ({err; venv; tenv} : context) e =
+let rec transExp ({err; venv; tenv; break} : context) e =
   let rec trexp (A.Exp {exp_base; pos}) : TA.exp =
     match exp_base with
     | A.IntExp i -> TA.Exp {exp_base= TA.IntExp i; pos; ty= Ty.INT}
@@ -53,29 +54,62 @@ let rec transExp ({err; venv; tenv} : context) e =
        match S.look (tenv, typ) with
        | None -> ( Err.error err pos (EFmt.errorTypeDoesNotExist typ) ;
                    err_exp pos )
-       | Some type_rec ->
+       | Some type_rec -> (
           match actual_type err pos type_rec with
-          | RECORD (fields = t_fileds; _) ->
-          | _ -> raise NotImplemented ) *)
+          | RECORD (fields = t_fields; _) -> (
+            if List.length fields != List.length t_fields then (
+              Err.error err pos EFmt.errorRecordFields
+              err_exp pos
+            ) else
+              List.map (fun ff -> match ff with
+                | ((name_given, val_given), (name_expec, val_ty_expec)) ->
+                  if name_given != name_expec then (
+                    Err.error err pos (EFmt.errorRecordFieldName name_given name_expec)
+                    err_exp pos
+                  ) else (
+
+                  )
+              ) List.combind fields t_fields
+            (* let (field_names_given, field_vals_given) = List.split fields in
+            let (field_names_expec, field_vals_expec) = List.split t_fields in *)
+
+          )
+          | _ -> raise NotImplemented
+       )) *)
     | A.IfExp {test; thn; els} -> if_exp test thn els pos
-    | A.WhileExp {test; body} ->
-        let (TA.Exp {ty= testTy; _} as evalTest) = trexp test in
-        let (TA.Exp {ty= bodyTy; _} as evalBody) = trexp body in
-        if testTy == Ty.INT then
-          if (* Test has correct type. *)
-             bodyTy == Ty.VOID then
-            (* Body has correct return type. *)
+    | A.WhileExp {test; body} -> (
+        let (TA.Exp {ty= testTy; _} as t_test) = trexp test in
+        let (TA.Exp {ty= bodyTy; _} as t_body) =
+          transExp {err; venv; tenv; break= true} body
+        in
+        match (testTy, bodyTy) with
+        | Ty.INT, Ty.VOID ->
             TA.Exp
-              { exp_base= TA.WhileExp {test= evalTest; body= evalBody}
+              { exp_base= TA.WhileExp {test= t_test; body= t_body}
               ; pos
-              ; ty= bodyTy } (* ---------- TODO : break = true ----------- *)
-          else (
-            (* Body should have returned type VOID. *)
+              ; ty= bodyTy }
+            (* ---------- TODO : break = true ----------- *)
+        | Ty.INT, _ ->
             Err.error err pos (EFmt.errorWhileShouldBeVoid bodyTy) ;
+            err_exp pos
+        | _ ->
+            Err.error err pos (EFmt.errorIntRequired testTy) ;
             err_exp pos )
+    (*| ForExp {var; escape; lo; hi; body} -> (
+          let (TA.Exp {ty = loTy ; _} as t_lo) = trexp lo in
+          let (TA.Exp {ty = hiTy ; _} as t_hi) = trexp hi in
+          match (loTy, hiTy) with
+          | (Ty.INT, Ty.INT) -> (
+            let (TA.Exp {ty=bodyTy;_} as t_body) = transExp {err; venv (*UPDATE*);tenv; break= true}
+          )
+          | (Ty.INT, _     ) -> Err.error err pos (EFmt.errorIntRequired hiTy)
+          | _                -> Err.error err pos (EFmt.errorIntRequired loTy)
+      )
+    *)
+    | A.BreakExp ->
+        if break then TA.Exp {exp_base= BreakExp; pos; ty= Ty.VOID}
         else (
-          (* Test should have had type int. *)
-          Err.error err pos (EFmt.errorIntRequired testTy) ;
+          Err.error err pos EFmt.errorBreak ;
           err_exp pos )
     | _ -> raise NotImplemented
   (* Compute an error expression. *)
@@ -119,43 +153,37 @@ let rec transExp ({err; venv; tenv} : context) e =
         err_exp pos
   and if_exp test thn els pos =
     (* Type check test and then. *)
-    let (TA.Exp {ty= testTy; _} as evalTest) = trexp test in
-    let (TA.Exp {ty= thnTy; _} as evalThn) = trexp thn in
-    (* Check test *)
-    if testTy == Ty.INT then
-      (* Test is INT. *)
-      (* Check if there exists an else statement. *)
-      match els with
-      | None ->
-          if (* No else statement. *)
-             thnTy == Ty.VOID then
-            (* Correct thn-body type. *)
+    let (TA.Exp {ty= testTy; _} as t_test) = trexp test in
+    let (TA.Exp {ty= thnTy; _} as t_thn) = trexp thn in
+    (* Check for else. *)
+    match els with
+    | None -> (
+      match (testTy, thnTy) with
+      | Ty.INT, Ty.VOID ->
+          TA.Exp
+            { exp_base= TA.IfExp {test= t_test; thn= t_thn; els= None}
+            ; pos
+            ; ty= thnTy }
+      | Ty.INT, _ ->
+          Err.error err pos (EFmt.errorIfThenShouldBeVoid thnTy) ;
+          err_exp pos
+      | _ ->
+          Err.error err pos (EFmt.errorIntRequired testTy) ;
+          err_exp pos )
+    | Some elsSt -> (
+        let (TA.Exp {ty= elsTy; _} as t_els) = trexp elsSt in
+        match (testTy, thnTy, elsTy) with
+        | Ty.INT, t1, t2 when t1 = t2 ->
             TA.Exp
-              { exp_base= TA.IfExp {test= evalTest; thn= evalThn; els= None}
-              ; pos
-              ; ty= thnTy }
-          else (
-            (* Thn-body is not void. *)
-            Err.error err pos (EFmt.errorIfThenShouldBeVoid thnTy) ;
-            err_exp pos )
-      | Some elseSt ->
-          (* With else statement. *)
-          let (TA.Exp {ty= elsTy; _} as evalEls) = trexp elseSt in
-          if thnTy == elsTy then
-            (* Same return type for then and else. *)
-            TA.Exp
-              { exp_base=
-                  TA.IfExp {test= evalTest; thn= evalThn; els= Some evalEls}
+              { exp_base= TA.IfExp {test= t_test; thn= t_els; els= Some t_els}
               ; pos
               ; ty= elsTy }
-          else (
-            (* Not same return type for then and else. *)
+        | Ty.INT, _, _ ->
             Err.error err pos (EFmt.errorIfBranchesNotSameType thnTy elsTy) ;
+            err_exp pos
+        | _ ->
+            Err.error err pos (EFmt.errorIntRequired testTy) ;
             err_exp pos )
-    else (
-      (* Test is not INT. *)
-      Err.error err pos (EFmt.errorIntRequired testTy) ;
-      err_exp pos )
   and trvar (A.Var {var_base; pos}) : TA.var =
     match var_base with
     (* Simple var i.e. `x` *)
@@ -215,8 +243,21 @@ let rec transExp ({err; venv; tenv} : context) e =
   in
   trexp e
 
-and transDecl ({err; venv; tenv} : context) dec =
-  match dec with _ -> raise NotImplemented
+and transDecl ({err; venv; tenv; break} as ctx : context) dec =
+  match dec with
+  | A.VarDec {name; escape; typ= None; init; pos} -> (
+      let (TA.Exp {pos= p; ty= etyp; _} as texp) = transExp ctx init in
+      match etyp with
+      | Ty.NIL ->
+          Err.error err p EFmt.errorInferNilType ;
+          (TA.VarDec {name; escape; typ= Ty.ERROR; init= texp; pos}, ctx)
+      | Ty.VOID ->
+          Err.error err p EFmt.errorVoid ;
+          (TA.VarDec {name; escape; typ= Ty.ERROR; init= texp; pos}, ctx)
+      | t ->
+          ( TA.VarDec {name; escape; typ= t; init= texp; pos}
+          , {err; venv= S.enter (venv, name, E.VarEntry t); tenv; break} ) )
+  | _ -> raise NotImplemented
 
 and actual_type err pos = function
   | NAME (sym, opt_ty_ref) -> (
@@ -231,4 +272,4 @@ and actual_type err pos = function
 
 let transProg (e : A.exp) : TA.exp * Err.errenv =
   let err = Err.initial_env in
-  (transExp {venv= E.baseVenv; tenv= E.baseTenv; err} e, err)
+  (transExp {venv= E.baseVenv; tenv= E.baseTenv; err; break= false} e, err)
