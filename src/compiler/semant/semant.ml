@@ -91,6 +91,16 @@ let rec transExp ({err; venv; tenv; break} : context) e =
       let (t_exps, ty) = t_exp exps in
       TA.Exp { exp_base = TA.SeqExp t_exps ; pos ; ty}
     )
+    | AssignExp {var; exp} -> (
+      let (TA.Var {var_base ; ty = varTy; _} as t_var) = trvar var in
+      let (Exp {ty = expTy ; _} as t_exp) = trexp exp in
+      if varTy == expTy && assignable_var var_base then (
+        TA.Exp {exp_base = TA.AssignExp {var = t_var ; exp = t_exp}; pos ; ty = varTy}
+      ) else (
+        Err.error err pos (EFmt.errorCoercible varTy expTy); (*Not sure if correct err_msg*)
+        err_exp pos
+      )
+    )
     | A.IfExp {test; thn; els} -> if_exp test thn els pos
     | A.WhileExp {test; body} -> (
         let (TA.Exp {ty= testTy; _} as t_test) = trexp test in
@@ -115,7 +125,7 @@ let rec transExp ({err; venv; tenv; break} : context) e =
           let (TA.Exp {ty = hiTy ; _} as t_hi) = trexp hi in
           match (loTy, hiTy) with
           | (Ty.INT, Ty.INT) -> (
-            let (TA.Exp {ty=bodyTy;_} as t_body) = transExp {err; venv = (S.enter (venv, var, (E.VarEntry Ty.INT))) ; tenv; break= true} body in
+            let (TA.Exp {ty=bodyTy;_} as t_body) = transExp {err; venv = (S.enter (venv, var, (E.VarEntry {assignable = false ; ty = Ty.INT}))) ; tenv; break= true} body in
             if bodyTy == Ty.VOID then
               TA.Exp { exp_base = ForExp { var ; escape ; lo = t_lo ; hi = t_hi ; body = t_body } ; pos ; ty = bodyTy }
             else (
@@ -172,6 +182,15 @@ let rec transExp ({err; venv; tenv; break} : context) e =
     | _ ->
         Err.error err pos (EFmt.errorUsingVariableAsFunction func) ;
         err_exp pos
+  and assignable_var var = (
+    match var with
+    | TA.SimpleVar s -> (
+      match S.look (venv, s) with
+      | Some E.VarEntry {assignable ; _} -> assignable
+      | _ -> false
+    )
+    | _ -> false
+  )
   and if_exp test thn els pos =
     (* Type check test and then. *)
     let (TA.Exp {ty= testTy; _} as t_test) = trexp test in
@@ -217,7 +236,7 @@ let rec transExp ({err; venv; tenv; break} : context) e =
           TA.Var {var_base= TA.SimpleVar s; pos; ty= Ty.ERROR}
       | Some ent -> (
         match ent with
-        | VarEntry ty -> TA.Var {var_base= TA.SimpleVar s; pos; ty}
+        | VarEntry {ty; _} -> TA.Var {var_base= TA.SimpleVar s; pos; ty}
         | FunEntry _ ->
             (*  *)
             Err.error err pos (EFmt.errorUsingFunctionAsVariable s) ;
@@ -277,7 +296,7 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec =
           (TA.VarDec {name; escape; typ= Ty.ERROR; init= texp; pos}, ctx)
       | t ->
           ( TA.VarDec {name; escape; typ= t; init= texp; pos}
-          , {err; venv= S.enter (venv, name, E.VarEntry t); tenv; break} ) )
+          , {err; venv= S.enter (venv, name, E.VarEntry {assignable = true; ty = t}); tenv; break} ) )
   | _ -> raise NotImplemented
 
 and actual_type err pos = function

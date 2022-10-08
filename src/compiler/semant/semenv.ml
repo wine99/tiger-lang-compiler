@@ -8,7 +8,7 @@ module S = Symbol
 module Ty = Types
 
 type enventry =
-  | VarEntry of Types.ty
+  | VarEntry of {assignable: bool; ty: Types.ty}
   | FunEntry of {formals: Types.ty list; result: Types.ty}
 
 let add k v t = S.enter (t, k, v)
