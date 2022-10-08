@@ -25,7 +25,7 @@ exception NotImplemented
 
 open Ty
 
-let rec transExp ({err; venv; tenv; break} : context) e =
+let rec transExp ({err; venv; tenv; break} as ctx : context) e =
   let rec trexp (A.Exp {exp_base; pos}) : TA.exp =
     match exp_base with
     | A.IntExp i -> TA.Exp {exp_base= TA.IntExp i; pos; ty= Ty.INT}
@@ -141,7 +141,16 @@ let rec transExp ({err; venv; tenv; break} : context) e =
         else (
           Err.error err pos EFmt.errorBreak ;
           err_exp pos )
-    | A.LetExp {decls ; body} when decls = [] -> trexp body
+    | A.LetExp {decls ; body} -> ( (*Is LetEmpty not just a part of this?*)
+      let t_decl_func acc decl = (
+        let (t_decls, ctx0) = acc in
+        let (t_decl, ctx1) = transDecl ctx0 decl in
+        (t_decl :: t_decls, ctx1)
+      ) in
+      let (t_decls, ctx_new) = (List.fold_left (t_decl_func) ([], ctx) decls) in
+      let (TA.Exp {ty ; _} as t_body) = transExp ctx_new body in
+      TA.Exp { exp_base = TA.LetExp {decls = t_decls ; body = t_body} ; pos ; ty }
+    )
     | _ -> raise NotImplemented
   (* Compute an error expression. *)
   and err_exp pos = TA.Exp {exp_base= TA.ErrorExp; pos; ty= Ty.ERROR}
