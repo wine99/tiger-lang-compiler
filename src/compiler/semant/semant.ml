@@ -27,6 +27,8 @@ open Ty
 
 open Oper
 let arithOps = [PlusOp; MinusOp; TimesOp; DivideOp; ExponentOp]
+let compOps = [LtOp; LeOp; GtOp; GeOp]
+let eqOps = [EqOp; NeqOp]
 
 let rec transExp ({err; venv; tenv; break} as ctx : context) e =
   let rec trexp (A.Exp {exp_base; pos}) : TA.exp =
@@ -53,6 +55,24 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
           ; pos
           ; ty= INT }
+    | A.OpExp {left; oper; right} when List.exists (fun op -> op = oper) compOps -> (
+        let (Exp {ty= ty_left; _} as t_left) = trexp left in
+        let (Exp {ty= ty_right; _} as t_right) = trexp right in
+        match ty_left , ty_right with
+        | INT, INT | STRING, STRING ->
+            TA.Exp
+              { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
+              ; pos
+              ; ty= INT }
+        | _ ->
+            Err.error err pos (EFmt.errorOtherComparison ty_left ty_right) ;
+            err_exp pos
+    )
+    | A.OpExp {left; oper; right} when List.exists (fun op -> op = oper) eqOps -> (
+        let (Exp {ty= ty_left; _} as t_left) = trexp left in
+        let (Exp {ty= ty_right; _} as t_right) = trexp right in
+        raise NotImplemented
+    )
     | RecordExp {fields= fields_given; typ} -> (
       match S.look (tenv, typ) with
       | None ->
