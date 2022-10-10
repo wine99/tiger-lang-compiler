@@ -327,6 +327,14 @@ and actual_type err pos = function
     | Some a -> actual_type err pos a )
   | t -> t
 
+and is_subtype err t1 pos1 t2 pos2 =
+match (actual_type err pos1 t1, actual_type err pos2 t2) with
+| (Ty.NIL, Ty.RECORD _) -> true
+| _ -> t1 == t2
+
+and are_comparable err t1 pos1 t2 pos2 =
+t1 != Ty.VOID && ((is_subtype err t1 pos1 t2 pos2) || (is_subtype err t2 pos2 t1 pos1))
+
 (* no need to change the implementation of the top level function *)
 
 let transProg (e : A.exp) : TA.exp * Err.errenv =
