@@ -50,32 +50,42 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
           ; pos
           ; ty= INT }
-    (* | RecordExp {fields; typ} -> (
-       match S.look (tenv, typ) with
-       | None -> ( Err.error err pos (EFmt.errorTypeDoesNotExist typ) ;
-                   err_exp pos )
-       | Some type_rec -> (
-          match actual_type err pos type_rec with
-          | RECORD (fields = t_fields; _) -> (
-            if List.length fields != List.length t_fields then (
-              Err.error err pos EFmt.errorRecordFields
-              err_exp pos
-            ) else
-              List.map (fun ff -> match ff with
-                | ((name_given, val_given), (name_expec, val_ty_expec)) ->
-                  if name_given != name_expec then (
-                    Err.error err pos (EFmt.errorRecordFieldName name_given name_expec)
-                    err_exp pos
-                  ) else (
-
-                  )
-              ) List.combind fields t_fields
-            (* let (field_names_given, field_vals_given) = List.split fields in
-            let (field_names_expec, field_vals_expec) = List.split t_fields in *)
-
-          )
-          | _ -> raise NotImplemented
-       )) *)
+    | RecordExp {fields= fields_given; typ} -> (
+      match S.look (tenv, typ) with
+      | None ->
+          Err.error err pos (EFmt.errorTypeDoesNotExist typ) ;
+          err_exp pos
+      | Some type_rec -> (
+        match actual_type err pos type_rec with
+        | RECORD (fields , _) ->
+            let fields_expec = fields in
+            if List.length fields_given != List.length fields_expec then (
+              Err.error err pos EFmt.errorRecordFields ;
+              err_exp pos )
+            else
+              let t_fields =
+                List.map
+                  (fun ff ->
+                    match ff with
+                    | (name_given, val_given), (name_expec, val_ty_expec) ->
+                        if name_given != name_expec then (
+                          Err.error err pos
+                            (EFmt.errorRecordFieldName name_given name_expec) ;
+                          (name_given, err_exp pos) )
+                        else
+                          let (TA.Exp {ty; _} as t_val) = trexp val_given in
+                          if ty != val_ty_expec then (
+                            Err.error err pos
+                              (EFmt.errorRecordFieldType name_given val_ty_expec ty ) ;
+                            (name_given, err_exp pos) )
+                          else (name_given, t_val) )
+                  (List.combine fields_given fields_expec)
+              in
+              TA.Exp
+                {exp_base= TA.RecordExp {fields= t_fields}; pos; ty = type_rec}
+        | _ ->
+            Err.error err pos (EFmt.errorRecordType type_rec) ;
+            err_exp pos ) )
     | SeqExp exps -> (
       let rec t_exp = function
         | [] -> [], Ty.VOID
