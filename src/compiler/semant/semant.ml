@@ -316,6 +316,14 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec =
       | t ->
           ( TA.VarDec {name; escape; typ= t; init= texp; pos}
           , {err; venv= S.enter (venv, name, E.VarEntry {assignable = true; ty = t}); tenv; break} ) )
+  | A.FunctionDec funcdecls -> (
+    let type_of_arg arg = (
+      match arg with
+      | A.Field {typ = (sym, _); _} -> S.look (tenv, sym)
+    ) in
+    let t_args args = List.map (type_of_arg) args in
+    raise NotImplemented
+  )
   | _ -> raise NotImplemented
 
 and actual_type err pos = function
