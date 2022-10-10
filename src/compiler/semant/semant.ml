@@ -25,6 +25,9 @@ exception NotImplemented
 
 open Ty
 
+open Oper
+let arithOps = [PlusOp; MinusOp; TimesOp; DivideOp; ExponentOp]
+
 let rec transExp ({err; venv; tenv; break} as ctx : context) e =
   let rec trexp (A.Exp {exp_base; pos}) : TA.exp =
     match exp_base with
@@ -43,7 +46,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           Err.error err pos (EFmt.errorFunctionUndefined func) ;
           err_exp pos
       | Some tFunc -> call_exp func tFunc args pos )
-    | A.OpExp {left; oper; right} ->
+    | A.OpExp {left; oper; right} when List.exists (fun op -> op = oper) arithOps ->
         let t_left = check_type (trexp left) INT EFmt.errorArith in
         let t_right = check_type (trexp right) INT EFmt.errorArith in
         TA.Exp
