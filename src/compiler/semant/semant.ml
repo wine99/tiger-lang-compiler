@@ -24,6 +24,11 @@ exception NotImplemented
 (* the final code should work without this exception *)
 
 open Ty
+open Oper
+
+let arithOps = [PlusOp; MinusOp; TimesOp; DivideOp; ExponentOp]
+
+let compOps = [LtOp; LeOp; GtOp; GeOp]
 
 let rec transExp ({err; venv; tenv; break} as ctx : context) e =
   let rec trexp (A.Exp {exp_base; pos}) : TA.exp =
@@ -43,13 +48,72 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           Err.error err pos (EFmt.errorFunctionUndefined func) ;
           err_exp pos
       | Some tFunc -> call_exp func tFunc args pos )
-    | A.OpExp {left; oper; right} ->
+    | A.OpExp {left; oper; right}
+      when List.exists (fun op -> op = oper) arithOps ->
         let t_left = check_type (trexp left) INT EFmt.errorArith in
         let t_right = check_type (trexp right) INT EFmt.errorArith in
         TA.Exp
           { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
           ; pos
           ; ty= INT }
+    | A.OpExp {left; oper; right}
+      when List.exists (fun op -> op = oper) compOps -> (
+        let (Exp {ty= ty_left; _} as t_left) = trexp left in
+        let (Exp {ty= ty_right; _} as t_right) = trexp right in
+        match (ty_left, ty_right) with
+        | INT, INT | STRING, STRING ->
+            TA.Exp
+              { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
+              ; pos
+              ; ty= INT }
+        | _ ->
+            Err.error err pos (EFmt.errorOtherComparison ty_left ty_right) ;
+            err_exp pos )
+    | A.OpExp {left; oper; right} ->
+        let (Exp {ty= ty_left; pos= pos_left; _} as t_left) = trexp left in
+        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) =
+          trexp right
+        in
+        if
+          are_comparable err ty_left pos_left ty_right pos_right
+          || ty_left != NIL || ty_right != NIL
+        then
+          TA.Exp
+            { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
+            ; pos
+            ; ty= INT }
+        else (
+          Err.error err pos (EFmt.errorOtherComparison ty_left ty_right) ;
+          err_exp pos )
+    | ArrayExp {size= size_exp; init= init_exp; typ} -> (
+      match S.look (tenv, typ) with
+      | None ->
+          Err.error err pos (EFmt.errorTypeDoesNotExist typ) ;
+          err_exp pos
+      | Some type_arr -> (
+        match actual_type err pos type_arr with
+        | ARRAY (ty, _) -> (
+            let (Exp {ty= ty_size; pos= pos_size; _} as t_size_exp) =
+              trexp size_exp
+            in
+            let (Exp {ty= ty_init; pos= pos_init; _} as t_init_exp) =
+              trexp init_exp
+            in
+            match (ty_size, ty_init) with
+            | INT, _ when ty_init = ty ->
+                TA.Exp
+                  { exp_base= TA.ArrayExp {size= t_size_exp; init= t_init_exp}
+                  ; pos
+                  ; ty= type_arr }
+            | INT, _ ->
+                Err.error err pos_init (EFmt.errorArrayInitType ty_init ty) ;
+                err_exp pos
+            | _ ->
+                Err.error err pos_size (EFmt.errorIntRequired ty_size) ;
+                err_exp pos )
+        | _ ->
+            Err.error err pos (EFmt.errorArrayType type_arr) ;
+            err_exp pos ) )
     | RecordExp {fields= fields_given; typ} -> (
       match S.look (tenv, typ) with
       | None ->
@@ -330,6 +394,27 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
             ; venv= S.enter (venv, name, E.VarEntry {assignable= true; ty= t})
             ; tenv
             ; break } ) )
+  | A.VarDec {name; escape; typ= Some (t, tp); init; pos} -> (
+      let opt_expected_typ = S.look (tenv, t) in
+      let (TA.Exp {pos= p; ty= actual_typ; _} as texp) = transExp ctx init in
+      match opt_expected_typ with
+      | Some expected_typ ->
+          if is_subtype err actual_typ p expected_typ tp then
+            ( TA.VarDec {name; escape; typ= expected_typ; init= texp; pos}
+            , { err
+              ; venv=
+                  S.enter
+                    ( venv
+                    , name
+                    , E.VarEntry {assignable= true; ty= expected_typ} )
+              ; tenv
+              ; break } )
+          else (
+            Err.error err p @@ EFmt.errorCoercible actual_typ expected_typ ;
+            (TA.VarDec {name; escape; typ= Ty.ERROR; init= texp; pos}, ctx) )
+      | None ->
+          Err.error err tp @@ EFmt.errorTypeDoesNotExist t ;
+          (TA.VarDec {name; escape; typ= Ty.ERROR; init= texp; pos}, ctx) )
   | A.FunctionDec funcdecls ->
       (* Helper functions *)
       (* Convert field data entry to typed field data entry *)
@@ -417,6 +502,16 @@ and actual_type err pos = function
         Ty.ERROR
     | Some a -> actual_type err pos a )
   | t -> t
+
+(** Checks if t1 is a subtype of t2 *)
+and is_subtype err t1 pos1 t2 pos2 =
+  match (actual_type err pos1 t1, actual_type err pos2 t2) with
+  | Ty.NIL, Ty.RECORD _ -> true
+  | _ -> t1 == t2
+
+and are_comparable err t1 pos1 t2 pos2 =
+  t1 != Ty.VOID
+  && (is_subtype err t1 pos1 t2 pos2 || is_subtype err t2 pos2 t1 pos1)
 
 (* no need to change the implementation of the top level function *)
 
