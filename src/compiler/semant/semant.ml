@@ -57,7 +57,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           err_exp pos
       | Some type_rec -> (
         match actual_type err pos type_rec with
-        | RECORD (fields , _) ->
+        | RECORD (fields, _) ->
             let fields_expec = fields in
             if List.length fields_given != List.length fields_expec then (
               Err.error err pos EFmt.errorRecordFields ;
@@ -76,41 +76,39 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
                           let (TA.Exp {ty; _} as t_val) = trexp val_given in
                           if ty != val_ty_expec then (
                             Err.error err pos
-                              (EFmt.errorRecordFieldType name_given val_ty_expec ty ) ;
+                              (EFmt.errorRecordFieldType name_given
+                                 val_ty_expec ty ) ;
                             (name_given, err_exp pos) )
                           else (name_given, t_val) )
                   (List.combine fields_given fields_expec)
               in
               TA.Exp
-                {exp_base= TA.RecordExp {fields= t_fields}; pos; ty = type_rec}
+                {exp_base= TA.RecordExp {fields= t_fields}; pos; ty= type_rec}
         | _ ->
             Err.error err pos (EFmt.errorRecordType type_rec) ;
             err_exp pos ) )
-    | SeqExp exps -> (
-      let rec t_exp = function
-        | [] -> [], Ty.VOID
-        | [exp] -> (
-          let (TA.Exp {ty ; _} as t_exp) = trexp exp in
-          [t_exp], ty
-        )
-        | exp :: exps -> (
-          let (t_exps, ty) = t_exp exps in
-          trexp exp :: t_exps, ty
-        )
-      in
-      let (t_exps, ty) = t_exp exps in
-      TA.Exp { exp_base = TA.SeqExp t_exps ; pos ; ty}
-    )
-    | AssignExp {var; exp} -> (
-      let (TA.Var {var_base ; ty = varTy; _} as t_var) = trvar var in
-      let (Exp {ty = expTy ; _} as t_exp) = trexp exp in
-      if varTy == expTy && assignable_var var_base then (
-        TA.Exp {exp_base = TA.AssignExp {var = t_var ; exp = t_exp}; pos ; ty = varTy}
-      ) else (
-        Err.error err pos (EFmt.errorCoercible varTy expTy); (*Not sure if correct err_msg*)
-        err_exp pos
-      )
-    )
+    | SeqExp exps ->
+        let rec t_exp = function
+          | [] -> ([], Ty.VOID)
+          | [exp] ->
+              let (TA.Exp {ty; _} as t_exp) = trexp exp in
+              ([t_exp], ty)
+          | exp :: exps ->
+              let t_exps, ty = t_exp exps in
+              (trexp exp :: t_exps, ty)
+        in
+        let t_exps, ty = t_exp exps in
+        TA.Exp {exp_base= TA.SeqExp t_exps; pos; ty}
+    | AssignExp {var; exp} ->
+        let (TA.Var {var_base; ty= varTy; _} as t_var) = trvar var in
+        let (Exp {ty= expTy; _} as t_exp) = trexp exp in
+        if varTy == expTy && assignable_var var_base then
+          TA.Exp
+            {exp_base= TA.AssignExp {var= t_var; exp= t_exp}; pos; ty= varTy}
+        else (
+          Err.error err pos (EFmt.errorCoercible varTy expTy) ;
+          (*Not sure if correct err_msg*)
+          err_exp pos )
     | A.IfExp {test; thn; els} -> if_exp test thn els pos
     | A.WhileExp {test; body} -> (
         let (TA.Exp {ty= testTy; _} as t_test) = trexp test in
@@ -131,36 +129,50 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
             Err.error err pos (EFmt.errorIntRequired testTy) ;
             err_exp pos )
     | ForExp {var; escape; lo; hi; body} -> (
-          let (TA.Exp {ty = loTy ; _} as t_lo) = trexp lo in
-          let (TA.Exp {ty = hiTy ; _} as t_hi) = trexp hi in
-          match (loTy, hiTy) with
-          | (Ty.INT, Ty.INT) -> (
-            let (TA.Exp {ty=bodyTy;_} as t_body) = transExp {err; venv = (S.enter (venv, var, (E.VarEntry {assignable = false ; ty = Ty.INT}))) ; tenv; break= true} body in
+        let (TA.Exp {ty= loTy; _} as t_lo) = trexp lo in
+        let (TA.Exp {ty= hiTy; _} as t_hi) = trexp hi in
+        match (loTy, hiTy) with
+        | Ty.INT, Ty.INT ->
+            let (TA.Exp {ty= bodyTy; _} as t_body) =
+              transExp
+                { err
+                ; venv=
+                    S.enter
+                      (venv, var, E.VarEntry {assignable= false; ty= Ty.INT})
+                ; tenv
+                ; break= true }
+                body
+            in
             if bodyTy == Ty.VOID then
-              TA.Exp { exp_base = ForExp { var ; escape ; lo = t_lo ; hi = t_hi ; body = t_body } ; pos ; ty = bodyTy }
+              TA.Exp
+                { exp_base=
+                    ForExp {var; escape; lo= t_lo; hi= t_hi; body= t_body}
+                ; pos
+                ; ty= bodyTy }
             else (
-              Err.error err pos (EFmt.errorForShouldBeVoid bodyTy);
-              err_exp pos
-            )
-          )
-          | (Ty.INT, _     ) -> Err.error err pos (EFmt.errorIntRequired hiTy); err_exp pos
-          | _                -> Err.error err pos (EFmt.errorIntRequired loTy); err_exp pos
-      )
+              Err.error err pos (EFmt.errorForShouldBeVoid bodyTy) ;
+              err_exp pos )
+        | Ty.INT, _ ->
+            Err.error err pos (EFmt.errorIntRequired hiTy) ;
+            err_exp pos
+        | _ ->
+            Err.error err pos (EFmt.errorIntRequired loTy) ;
+            err_exp pos )
     | A.BreakExp ->
         if break then TA.Exp {exp_base= BreakExp; pos; ty= Ty.VOID}
         else (
           Err.error err pos EFmt.errorBreak ;
           err_exp pos )
-    | A.LetExp {decls ; body} -> ( (*Is LetEmpty not just a part of this?*)
-      let t_decl_func acc decl = (
-        let (t_decls, ctx0) = acc in
-        let (t_decl, ctx1) = transDecl ctx0 decl in
-        (t_decl :: t_decls, ctx1)
-      ) in
-      let (t_decls, ctx_new) = (List.fold_left (t_decl_func) ([], ctx) decls) in
-      let (TA.Exp {ty ; _} as t_body) = transExp ctx_new body in
-      TA.Exp { exp_base = TA.LetExp {decls = t_decls ; body = t_body} ; pos ; ty }
-    )
+    | A.LetExp {decls; body} ->
+        (*Is LetEmpty not just a part of this?*)
+        let t_decl_func acc decl =
+          let t_decls, ctx0 = acc in
+          let t_decl, ctx1 = transDecl ctx0 decl in
+          (t_decl :: t_decls, ctx1)
+        in
+        let t_decls, ctx_new = List.fold_left t_decl_func ([], ctx) decls in
+        let (TA.Exp {ty; _} as t_body) = transExp ctx_new body in
+        TA.Exp {exp_base= TA.LetExp {decls= t_decls; body= t_body}; pos; ty}
     | _ -> raise NotImplemented
   (* Compute an error expression. *)
   and err_exp pos = TA.Exp {exp_base= TA.ErrorExp; pos; ty= Ty.ERROR}
@@ -201,15 +213,13 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
     | _ ->
         Err.error err pos (EFmt.errorUsingVariableAsFunction func) ;
         err_exp pos
-  and assignable_var var = (
+  and assignable_var var =
     match var with
     | TA.SimpleVar s -> (
       match S.look (venv, s) with
-      | Some E.VarEntry {assignable ; _} -> assignable
-      | _ -> false
-    )
+      | Some (E.VarEntry {assignable; _}) -> assignable
+      | _ -> false )
     | _ -> false
-  )
   and if_exp test thn els pos =
     (* Type check test and then. *)
     let (TA.Exp {ty= testTy; _} as t_test) = trexp test in
@@ -302,7 +312,8 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
   in
   trexp e
 
-and transDecl ({err; venv; tenv; break} as ctx : context) dec : TA.decl * context =
+and transDecl ({err; venv; tenv; break} as ctx : context) dec :
+    TA.decl * context =
   match dec with
   | A.VarDec {name; escape; typ= None; init; pos} -> (
       let (TA.Exp {pos= p; ty= etyp; _} as texp) = transExp ctx init in
@@ -315,55 +326,87 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec : TA.decl * contex
           (TA.VarDec {name; escape; typ= Ty.ERROR; init= texp; pos}, ctx)
       | t ->
           ( TA.VarDec {name; escape; typ= t; init= texp; pos}
-          , {err; venv= S.enter (venv, name, E.VarEntry {assignable = true; ty = t}); tenv; break} ) )
-  | A.FunctionDec funcdecls -> (
-    (* Extent venv with functions *)
-    let t_arg = ( function
-      | A.Field {name ; escape ; typ = (sym, _) ; pos } -> (
-        match S.look (tenv, sym) with
-        | Some ty -> TA.Arg {name ; escape ; ty ; pos }
-        | None    -> TA.Arg {name ; escape ; ty = Ty.ERROR ; pos } (* type of argument not defined *)
-      )
-    ) in
-    let t_args params = List.fold_right (fun arg -> fun acc -> (t_arg arg) :: acc) params [] in
-    let t_result res = (match res with
-    | Some (sym, _) -> (
-      match S.look (tenv, sym) with
-      | Some ty -> ty
-      | None -> Ty.ERROR (* result type not defined *)
-      )
-    | None -> Ty.VOID
-    ) in
-    let t_decl venv1 = ( function
-      | A.Fdecl {name ; params ; result ; _} -> (
-        let t_args = List.map (fun arg -> let TA.Arg {ty ; _} = arg in ty ) (t_args params) in
-        S.enter (venv1, name, E.FunEntry {formals = t_args; result= t_result result})
-      )
-    ) in
-    let venv_func = List.fold_left (fun acc -> fun decl -> t_decl acc decl) venv funcdecls in
-    (* check if bodies have correct type *)
-    let venv_arg venv_args arg = (
-      let TA.Arg {name ; ty ; _} = t_arg arg in
-      S.enter (venv_args, name, E.VarEntry { assignable = true ; ty })) in
-    let venv_args args = List.fold_left (fun acc -> fun arg -> venv_arg acc arg) venv_func args in
-    let t_func = (
-      function
-      | A.Fdecl { name ; params ; result ; body ; pos } ->
-        (* extend venv with the argument types for the function *)
-        let venv_w_args = venv_args params in
-        (* type check the body *)
-        let (TA.Exp { ty ; _ } as t_body) = transExp ({ err; venv = venv_w_args; tenv; break = false }) body in
-        let t_res = t_result result in
-        if t_res == ty then (
-          TA.Fdecl { name ; args = (t_args params) ; result = t_result result ; body = t_body ; pos }
-        )
-        else raise NotImplemented
-    ) in
-    let t_funcs = TA.FunctionDec (
-      List.fold_right (fun func -> fun acc -> (t_func func) :: acc ) funcdecls []
-    ) in
-    (t_funcs, {err; venv = venv_func; tenv; break})
-  )
+          , { err
+            ; venv= S.enter (venv, name, E.VarEntry {assignable= true; ty= t})
+            ; tenv
+            ; break } ) )
+  | A.FunctionDec funcdecls ->
+      (* Helper functions *)
+      (* Convert field data entry to typed field data entry *)
+      let t_arg = function
+        | A.Field {name; escape; typ= sym, _; pos} -> (
+          match S.look (tenv, sym) with
+          | Some ty -> TA.Arg {name; escape; ty; pos}
+          | None ->
+              TA.Arg {name; escape; ty= Ty.ERROR; pos}
+              (* type of argument not defined *) )
+      in
+      (* Convert list of parameters to list of typed parameters *)
+      let t_args params =
+        List.fold_right (fun arg acc -> t_arg arg :: acc) params []
+      in
+      (* Lookup given return type of function *)
+      let t_result = function
+        | Some (sym, _) -> (
+          match S.look (tenv, sym) with
+          | Some ty -> ty
+          | None -> Ty.ERROR (* result type not defined *) )
+        | None -> Ty.VOID (* no annotation => void return type *)
+      in
+      (* Extent venv with given funcdecl *)
+      let venv_func venv = function
+        | A.Fdecl {name; params; result; _} ->
+            let t_args =
+              List.map
+                (fun arg ->
+                  let (TA.Arg {ty; _}) = arg in
+                  ty )
+                (t_args params)
+            in
+            S.enter
+              ( venv
+              , name
+              , E.FunEntry {formals= t_args; result= t_result result} )
+      in
+      (* Extent venv with funcdecls *)
+      let venv_funcs =
+        List.fold_left (fun acc decl -> venv_func acc decl) venv funcdecls
+      in
+      (* Extent venv with argument *)
+      let venv_arg venv_args arg =
+        let (TA.Arg {name; ty; _}) = t_arg arg in
+        S.enter (venv_args, name, E.VarEntry {assignable= true; ty})
+      in
+      (* Extent venv with arguments *)
+      let venv_args args =
+        List.fold_left (fun acc arg -> venv_arg acc arg) venv_funcs args
+      in
+      (* Type check the function *)
+      let t_func = function
+        | A.Fdecl {name; params; result; body; pos} ->
+            (* extend venv with the argument types for the function *)
+            let venv_w_args = venv_args params in
+            (* type check the body *)
+            let (TA.Exp {ty; _} as t_body) =
+              transExp {err; venv= venv_w_args; tenv; break= false} body
+            in
+            let t_res = t_result result in
+            if t_res == ty then
+              TA.Fdecl
+                { name
+                ; args= t_args params
+                ; result= t_result result
+                ; body= t_body
+                ; pos }
+            else raise NotImplemented
+      in
+      let t_funcs =
+        TA.FunctionDec
+          (List.fold_right
+             (fun func acc -> t_func func :: acc)
+             funcdecls [] )
+      in
+      (t_funcs, {err; venv= venv_funcs; tenv; break})
   | _ -> raise NotImplemented
 
 and actual_type err pos = function
