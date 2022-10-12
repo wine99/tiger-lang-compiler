@@ -36,7 +36,6 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
     | A.IntExp i -> TA.Exp {exp_base= TA.IntExp i; pos; ty= Ty.INT}
     | A.StringExp s -> TA.Exp {exp_base= TA.StringExp s; pos; ty= Ty.STRING}
     | A.NilExp -> TA.Exp {exp_base= TA.NilExp; pos; ty= Ty.NIL}
-    | A.SeqExp [] -> TA.Exp {exp_base= TA.SeqExp []; pos; ty= Ty.VOID}
     | VarExp var -> (
         let tvar = trvar var in
         match tvar with
@@ -151,6 +150,9 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         | _ ->
             Err.error err pos (EFmt.errorRecordType type_rec) ;
             err_exp pos ) )
+
+    | A.SeqExp [] -> TA.Exp {exp_base= TA.SeqExp []; pos; ty= Ty.VOID}
+    | A.SeqExp [ A.Exp { exp_base = A.SeqExp _  ; _ } as e ] -> trexp e
     | SeqExp exps ->
         let rec t_exp = function
           | [] -> ([], Ty.VOID)
@@ -290,7 +292,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
     let (TA.Exp {ty= thnTy; _} as t_thn) = trexp thn in
     (* Check for else. *)
     match els with
-    | None -> (
+    | None -> ( (* No else statement *)
       match (testTy, thnTy) with
       | Ty.INT, Ty.VOID ->
           TA.Exp
@@ -303,12 +305,12 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
       | _ ->
           Err.error err pos (EFmt.errorIntRequired testTy) ;
           err_exp pos )
-    | Some elsSt -> (
+    | Some elsSt -> ( (* With else statement *)
         let (TA.Exp {ty= elsTy; _} as t_els) = trexp elsSt in
         match (testTy, thnTy, elsTy) with
         | Ty.INT, t1, t2 when t1 = t2 ->
             TA.Exp
-              { exp_base= TA.IfExp {test= t_test; thn= t_els; els= Some t_els}
+              { exp_base= TA.IfExp {test= t_test; thn= t_thn; els= Some t_els}
               ; pos
               ; ty= elsTy }
         | Ty.INT, _, _ ->
