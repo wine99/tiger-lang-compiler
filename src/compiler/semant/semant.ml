@@ -359,10 +359,10 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec : TA.decl * contex
         )
         else raise NotImplemented
     ) in
-    let t_funcs funcdecls = TA.FunctionDec (
-      List.fold_right (fun func -> fun acc -> (t_func func) :: acc ) [] funcdecls
+    let t_funcs = TA.FunctionDec (
+      List.fold_right (fun func -> fun acc -> (t_func func) :: acc ) funcdecls []
     ) in
-    ((t_funcs funcdecls), {err; venv = venv_func; tenv; break})
+    (t_funcs, {err; venv = venv_func; tenv; break})
   )
   | _ -> raise NotImplemented
 
