@@ -26,8 +26,8 @@ let errorRecordType ty =
 let errorRecordFields = "record fields do not match"
 
 let errorRecordFieldType id t_expec t_given =
-  "record field " ^ string_of_symbol id ^ "has type " ^ string_of_type t_expec
-  ^ ", but received " ^ string_of_type t_given
+  "record field " ^ string_of_symbol id ^ "has type "
+  ^ string_of_type t_expec ^ ", but received " ^ string_of_type t_given
 
 let errorRecordNonExistingField id ty =
   "the field " ^ string_of_symbol id ^ " does not exist on record of type "
