@@ -81,6 +81,32 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           Err.error err pos (EFmt.errorOtherComparison ty_left ty_right) ;
           err_exp pos
         )
+    | ArrayExp {size= size_exp; init= init_exp; typ} -> (
+      match S.look (tenv, typ) with
+      | None ->
+          Err.error err pos (EFmt.errorTypeDoesNotExist typ) ;
+          err_exp pos
+      | Some type_arr -> (
+        match actual_type err pos type_arr with
+        | ARRAY (ty, _) -> (
+            let (Exp {ty= ty_size; pos= pos_size; _} as t_size_exp) = trexp size_exp in
+            let (Exp {ty= ty_init; pos= pos_init; _} as t_init_exp) = trexp init_exp in
+            match ty_size , ty_init with
+            | INT , _ when ty_init = ty ->
+                TA.Exp
+                  { exp_base= TA.ArrayExp {size= t_size_exp; init=t_init_exp}
+                  ; pos
+                  ; ty= type_arr }
+            | INT , _ ->
+                Err.error err pos_init (EFmt.errorArrayInitType ty_init ty) ;
+                err_exp pos
+            | _ ->
+                Err.error err pos_size (EFmt.errorIntRequired ty_size) ;
+                err_exp pos
+        )
+        | _ ->
+          Err.error err pos (EFmt.errorArrayType type_arr) ;
+          err_exp pos ) )
     | RecordExp {fields= fields_given; typ} -> (
       match S.look (tenv, typ) with
       | None ->
