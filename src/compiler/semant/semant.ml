@@ -152,7 +152,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
             err_exp pos ) )
 
     | A.SeqExp [] -> TA.Exp {exp_base= TA.SeqExp []; pos; ty= Ty.VOID}
-    | A.SeqExp [ A.Exp { exp_base = A.SeqExp _  ; _ } as e ] -> trexp e
+    | A.SeqExp [ A.Exp _ as e ] -> trexp e
     | A.SeqExp exps ->
         let rec t_exp = function
           | [] -> ([], Ty.VOID)
