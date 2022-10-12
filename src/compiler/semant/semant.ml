@@ -302,7 +302,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
   in
   trexp e
 
-and transDecl ({err; venv; tenv; break} as ctx : context) dec =
+and transDecl ({err; venv; tenv; break} as ctx : context) dec : TA.decl * context =
   match dec with
   | A.VarDec {name; escape; typ= None; init; pos} -> (
       let (TA.Exp {pos= p; ty= etyp; _} as texp) = transExp ctx init in
@@ -344,11 +344,19 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec =
     let venv_arg venv_args arg = (
       let (name, ty) = type_of_arg arg in
       S.enter (venv_args, name, E.VarEntry { assignable = true ; ty })) in
-    let venv_args args = List.fold_left (fun acc -> fun arg -> venv_arg acc arg) venv_func in
-    let t_func = (
-
+    let venv_args args = List.fold_left (fun acc -> fun arg -> venv_arg acc arg) venv_func args in
+    let t_func func = (
+      match func with
+      | A.Fdecl { name ; params ; body ; _ } -> (
+        let venv_w_args = venv_args params in
+        let (TA.Exp { ty ; _ } as t_body) = transExp ({ err; venv = venv_w_args; tenv; break = false }) body in
+        match S.look (venv_w_args, name) with
+        | Some (FunEntry {result ; _}) -> if result == ty then t_body else raise NotImplemented
+        | _                            -> raise NotImplemented
+      )
     ) in
-    raise NotImplemented
+    let t_funcs = raise NotImplemented in
+    (t_funcs, {err; venv = venv_func; tenv; break})
   )
   | _ -> raise NotImplemented
 
