@@ -317,21 +317,22 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec =
           ( TA.VarDec {name; escape; typ= t; init= texp; pos}
           , {err; venv= S.enter (venv, name, E.VarEntry {assignable = true; ty = t}); tenv; break} ) )
   | A.FunctionDec funcdecls -> (
+    (* Extent venv with functions *)
     let type_of_arg = (function
-      | A.Field {typ = (sym, _); _} -> (
+      | A.Field { name; typ = (sym, _); _} -> (
         match S.look (tenv, sym) with
-        | Some x -> x
-        | None   -> Ty.ERROR
+        | Some x -> (name, x)
+        | None   -> (name, Ty.ERROR) (* type of argument not defined *)
       )
     ) in
-    let t_args args = List.map (type_of_arg) args in
+    let t_args args = List.map (fun arg -> let (_, ty) = type_of_arg arg in ty) args in
     let t_result res = (match res with
     | Some (sym, _) -> (
       match S.look (tenv, sym) with
       | Some ty -> ty
-      | None -> Ty.ERROR
+      | None -> Ty.ERROR (* result type not defined *)
       )
-    | None -> Ty.ERROR
+    | None -> Ty.VOID
     ) in
     let t_decl venv1 = ( function
       | A.Fdecl {name ; params ; result ; _} -> (
@@ -339,7 +340,14 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec =
       )
     ) in
     let venv_func = List.fold_left (fun acc -> fun decl -> t_decl acc decl) venv funcdecls in
-    (* check if body has correct type *)
+    (* check if bodies have correct type *)
+    let venv_arg venv_args arg = (
+      let (name, ty) = type_of_arg arg in
+      S.enter (venv_args, name, E.VarEntry { assignable = true ; ty })) in
+    let venv_args args = List.fold_left (fun acc -> fun arg -> venv_arg acc arg) venv_func in
+    let t_func = (
+
+    ) in
     raise NotImplemented
   )
   | _ -> raise NotImplemented
