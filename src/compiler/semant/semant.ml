@@ -84,7 +84,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         else (
           Err.error err pos (EFmt.errorOtherComparison ty_left ty_right) ;
           err_exp pos )
-    | ArrayExp {size= size_exp; init= init_exp; typ} -> (
+    | A.ArrayExp {size= size_exp; init= init_exp; typ} -> (
       match S.look (tenv, typ) with
       | None ->
           Err.error err pos (EFmt.errorTypeDoesNotExist typ) ;
@@ -113,7 +113,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         | _ ->
             Err.error err pos (EFmt.errorArrayType type_arr) ;
             err_exp pos ) )
-    | RecordExp {fields= fields_given; typ} -> (
+    | A.RecordExp {fields= fields_given; typ} -> (
       match S.look (tenv, typ) with
       | None ->
           Err.error err pos (EFmt.errorTypeDoesNotExist typ) ;
@@ -153,7 +153,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
 
     | A.SeqExp [] -> TA.Exp {exp_base= TA.SeqExp []; pos; ty= Ty.VOID}
     | A.SeqExp [ A.Exp { exp_base = A.SeqExp _  ; _ } as e ] -> trexp e
-    | SeqExp exps ->
+    | A.SeqExp exps ->
         let rec t_exp = function
           | [] -> ([], Ty.VOID)
           | [exp] ->
@@ -165,7 +165,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         in
         let t_exps, ty = t_exp exps in
         TA.Exp {exp_base= TA.SeqExp t_exps; pos; ty}
-    | AssignExp {var; exp} ->
+    | A.AssignExp {var; exp} ->
         let (TA.Var {var_base; ty= varTy; _} as t_var) = trvar var in
         let (Exp {ty= expTy; _} as t_exp) = trexp exp in
         if varTy == expTy && assignable_var var_base then
@@ -194,7 +194,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         | _ ->
             Err.error err pos (EFmt.errorIntRequired testTy) ;
             err_exp pos )
-    | ForExp {var; escape; lo; hi; body} -> (
+    | A.ForExp {var; escape; lo; hi; body} -> (
         let (TA.Exp {ty= loTy; _} as t_lo) = trexp lo in
         let (TA.Exp {ty= hiTy; _} as t_hi) = trexp hi in
         match (loTy, hiTy) with
