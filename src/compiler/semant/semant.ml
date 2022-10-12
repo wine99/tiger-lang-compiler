@@ -318,14 +318,14 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec : TA.decl * contex
           , {err; venv= S.enter (venv, name, E.VarEntry {assignable = true; ty = t}); tenv; break} ) )
   | A.FunctionDec funcdecls -> (
     (* Extent venv with functions *)
-    let type_of_arg = (function
-      | A.Field { name; typ = (sym, _); _} -> (
+    let t_arg = ( function
+      | A.Field {name ; escape ; typ = (sym, _) ; pos } -> (
         match S.look (tenv, sym) with
-        | Some x -> (name, x)
-        | None   -> (name, Ty.ERROR) (* type of argument not defined *)
+        | Some ty -> TA.Arg {name ; escape ; ty ; pos }
+        | None    -> TA.Arg {name ; escape ; ty = Ty.ERROR ; pos } (* type of argument not defined *)
       )
     ) in
-    let t_args args = List.map (fun arg -> let (_, ty) = type_of_arg arg in ty) args in
+    let t_args params = List.fold_right (fun arg -> fun acc -> (t_arg arg) :: acc) params [] in
     let t_result res = (match res with
     | Some (sym, _) -> (
       match S.look (tenv, sym) with
@@ -336,27 +336,33 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec : TA.decl * contex
     ) in
     let t_decl venv1 = ( function
       | A.Fdecl {name ; params ; result ; _} -> (
-        S.enter (venv1, name, E.FunEntry {formals= t_args params; result= t_result result})
+        let t_args = List.map (fun arg -> let TA.Arg {ty ; _} = arg in ty ) (t_args params) in
+        S.enter (venv1, name, E.FunEntry {formals = t_args; result= t_result result})
       )
     ) in
     let venv_func = List.fold_left (fun acc -> fun decl -> t_decl acc decl) venv funcdecls in
     (* check if bodies have correct type *)
     let venv_arg venv_args arg = (
-      let (name, ty) = type_of_arg arg in
+      let TA.Arg {name ; ty ; _} = t_arg arg in
       S.enter (venv_args, name, E.VarEntry { assignable = true ; ty })) in
     let venv_args args = List.fold_left (fun acc -> fun arg -> venv_arg acc arg) venv_func args in
-    let t_func func = (
-      match func with
-      | A.Fdecl { name ; params ; body ; _ } -> (
+    let t_func = (
+      function
+      | A.Fdecl { name ; params ; result ; body ; pos } ->
+        (* extend venv with the argument types for the function *)
         let venv_w_args = venv_args params in
+        (* type check the body *)
         let (TA.Exp { ty ; _ } as t_body) = transExp ({ err; venv = venv_w_args; tenv; break = false }) body in
-        match S.look (venv_w_args, name) with
-        | Some (FunEntry {result ; _}) -> if result == ty then t_body else raise NotImplemented
-        | _                            -> raise NotImplemented
-      )
+        let t_res = t_result result in
+        if t_res == ty then (
+          TA.Fdecl { name ; args = (t_args params) ; result = t_result result ; body = t_body ; pos }
+        )
+        else raise NotImplemented
     ) in
-    let t_funcs = raise NotImplemented in
-    (t_funcs, {err; venv = venv_func; tenv; break})
+    let t_funcs funcdecls = TA.FunctionDec (
+      List.fold_right (fun func -> fun acc -> (t_func func) :: acc ) [] funcdecls
+    ) in
+    ((t_funcs funcdecls), {err; venv = venv_func; tenv; break})
   )
   | _ -> raise NotImplemented
 
