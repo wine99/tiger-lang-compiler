@@ -231,12 +231,13 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           err_exp pos )
     | A.LetExp {decls; body} ->
         (*Is LetEmpty not just a part of this?*)
-        let t_decl_func decl acc =
+        let t_decl_func acc decl =
           let t_decls, ctx0 = acc in
           let t_decl, ctx1 = transDecl ctx0 decl in
           (t_decl :: t_decls, ctx1)
         in
-        let t_decls, ctx_new = List.fold_right t_decl_func decls ([], ctx) in
+        let rev_t_decls, ctx_new = List.fold_left t_decl_func ([], ctx) decls in
+        let t_decls = List.rev rev_t_decls in
         let (TA.Exp {ty; _} as t_body) = transExp ctx_new body in
         TA.Exp {exp_base= TA.LetExp {decls= t_decls; body= t_body}; pos; ty}
     | _ -> raise NotImplemented
