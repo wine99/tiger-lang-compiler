@@ -414,6 +414,10 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec =
       | None ->
           Err.error err tp @@ EFmt.errorTypeDoesNotExist t ;
           (TA.VarDec {name; escape; typ= Ty.ERROR; init= texp; pos}, ctx) )
+  | A.TypeDec tydecs -> (
+    let tenv1 = List.fold_left (fun acc -> fun (A.Tdecl {name; _}) -> S.enter (tenv, name, Ty.NAME (name, ref None))) tenv tydecs in
+    raise NotImplemented
+  )
   | _ -> raise NotImplemented
 
 and actual_type err pos = function
