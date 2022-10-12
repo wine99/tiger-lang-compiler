@@ -521,15 +521,55 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
       in
       (t_funcs, {err; venv= venv_funcs; tenv; break})
   | A.TypeDec tydecs ->
-      let tenv', refs =
+      let tenv', name_ptrs =
         List.fold_left
-          (fun (tenv1, refs) (A.Tdecl {name; _}) ->
-            ( S.enter (tenv1, name, Ty.NAME (name, ref None))
-            , Ty.NAME (name, ref None) :: refs ) )
+          (fun (acc_tenv, acc_refs) (A.Tdecl {name; _}) ->
+            let nameptr = Ty.NAME (name, ref None) in
+            ( S.enter (acc_tenv, name, nameptr)
+            , nameptr :: acc_refs ))
           (tenv, []) tydecs
       in
-      raise NotImplemented
+      List.iter2
+        (fun (Ty.NAME (_, tyref)) (A.Tdecl {ty; _}) ->
+          tyref := make_type tenv' ty)
+        name_ptrs tydecs ;
+      if no_cycles name_ptrs then
+        let t_tydecs =
+          List.map2
+            (fun name_ptr (A.Tdecl {name; pos; _}) ->
+              TA.Tdecl {name; pos; ty=name_ptr})
+            name_ptrs tydecs
+        in
+        (TA.TypeDec t_tydecs , {err; venv; tenv= tenv'; break})
+      else (
+        (* Err.error err pos (EFmt.errorTypeDeclLoop (List.map (fun (A.Tdecl {name; _}) -> name) tydecs)) ; *)
+        raise NotImplemented ;
+      )
+
   | _ -> raise NotImplemented
+
+and no_cycles name_ptrs = true
+
+and make_type tenv = function
+  | A.NameTy (ty, _) -> (
+    match S.look (tenv, ty) with
+    | None -> raise NotImplemented
+    | Some ty -> Some ty
+  )
+  | A.RecordTy fields -> (
+      let t_fields =
+        List.map
+          (fun (A.Field {name; typ= (ty, _); _}) ->
+            match S.look (tenv, ty) with
+            | None -> raise NotImplemented
+            | Some ty -> (name , ty) )
+          fields
+      in Some (RECORD (t_fields , mkUnique ()))
+  )
+  | A.ArrayTy (ty, _) ->
+    match S.look (tenv, ty) with
+    | None -> raise NotImplemented
+    | Some ty -> Some (ARRAY (ty , mkUnique ()))
 
 and actual_type err pos = function
   | NAME (sym, opt_ty_ref) -> (
