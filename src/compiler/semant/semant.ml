@@ -520,10 +520,15 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
                 [] funcdecls ) )
       in
       (t_funcs, {err; venv= venv_funcs; tenv; break})
-  | A.TypeDec tydecs -> (
-    let tenv1 = List.fold_left (fun acc -> fun (A.Tdecl {name; _}) -> S.enter (tenv, name, Ty.NAME (name, ref None))) tenv tydecs in
-    raise NotImplemented
-  )
+  | A.TypeDec tydecs ->
+      let tenv', refs =
+        List.fold_left
+          (fun (tenv1, refs) (A.Tdecl {name; _}) ->
+            ( S.enter (tenv1, name, Ty.NAME (name, ref None))
+            , Ty.NAME (name, ref None) :: refs ) )
+          (tenv, []) tydecs
+      in
+      raise NotImplemented
   | _ -> raise NotImplemented
 
 and actual_type err pos = function
