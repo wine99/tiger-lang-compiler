@@ -170,7 +170,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         let (Exp {ty= expTy; _} as t_exp) = trexp exp in
         if varTy == expTy && assignable_var var_base then
           TA.Exp
-            {exp_base= TA.AssignExp {var= t_var; exp= t_exp}; pos; ty= varTy}
+            {exp_base= TA.AssignExp {var= t_var; exp= t_exp}; pos; ty= Ty.VOID}
         else (
           Err.error err pos (EFmt.errorCoercible varTy expTy) ;
           (*Not sure if correct err_msg*)
