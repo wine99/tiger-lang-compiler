@@ -313,7 +313,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
             TA.Exp
               { exp_base= TA.IfExp {test= t_test; thn= t_thn; els= Some t_els}
               ; pos
-              ; ty= elsTy }
+              ; ty= thnTy }
         | Ty.INT, _, _ ->
             Err.error err pos (EFmt.errorIfBranchesNotSameType thnTy elsTy) ;
             err_exp pos
@@ -426,6 +426,7 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
           match S.look (tenv, sym) with
           | Some ty -> TA.Arg {name; escape; ty; pos}
           | None ->
+              Err.error err pos (EFmt.errorTypeDoesNotExist sym) ;
               TA.Arg {name; escape; ty= Ty.ERROR; pos}
               (* type of argument not defined *) )
       in
@@ -435,10 +436,10 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
       in
       (* Lookup given return type of function *)
       let t_result = function
-        | Some (sym, _) -> (
+        | Some (sym, pos) -> (
           match S.look (tenv, sym) with
           | Some ty -> ty
-          | None -> Ty.ERROR (* result type not defined *) )
+          | None -> Err.error err pos (EFmt.errorTypeDoesNotExist sym) ; Ty.ERROR (* result type not defined *) )
         | None -> Ty.VOID (* no annotation => void return type *)
       in
       (* Extent venv with given funcdecl *)
@@ -483,10 +484,18 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
               TA.Fdecl
                 { name
                 ; args= t_args params
-                ; result= t_result result
+                ; result= t_res
                 ; body= t_body
                 ; pos }
-            else raise NotImplemented
+            else (
+              Err.error err pos (EFmt.errorFunctionReturn ty t_res);
+              TA.Fdecl
+              { name
+              ; args= t_args params
+              ; result= Ty.ERROR
+              ; body= t_body
+              ; pos }
+            )
       in
       let t_funcs =
         TA.FunctionDec
