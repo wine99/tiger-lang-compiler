@@ -507,13 +507,14 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
                  List.map
                    (fun x ->
                      let (TA.Fdecl {name; _}) = x in
-                     name )
+                     S.name name )
                    acc
                in
-               if List.exists (fun x -> x == name) acc_names then (
+               if List.exists (fun x -> x == (S.name name)) acc_names then (
                  Err.error err pos (EFmt.errorDuplicate name) ;
                  typed_func :: acc )
-               else typed_func :: acc )
+               else typed_func :: acc
+             )
              [] funcdecls )
         )
       in
