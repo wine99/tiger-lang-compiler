@@ -498,25 +498,29 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
                 ; pos } )
       in
       let t_funcs =
-        TA.FunctionDec (
-          List.rev
-          (List.fold_left
-             (fun acc func ->
-               let (TA.Fdecl {name; pos; _} as typed_func) = t_func func in
-               let acc_names =
-                 List.map
-                   (fun x ->
-                     let (TA.Fdecl {name; _}) = x in
-                     S.name name )
-                   acc
-               in
-               if List.exists (fun x -> String.equal x (S.name name)) acc_names then (
-                 Err.error err pos (EFmt.errorDuplicate name) ;
-                 typed_func :: acc )
-               else typed_func :: acc
-             )
-             [] funcdecls )
-        )
+        TA.FunctionDec
+          (List.rev
+             (List.fold_left
+                (fun acc func ->
+                  let (TA.Fdecl {name; pos; _} as typed_func) =
+                    t_func func
+                  in
+                  let acc_names =
+                    List.map
+                      (fun x ->
+                        let (TA.Fdecl {name; _}) = x in
+                        S.name name )
+                      acc
+                  in
+                  if
+                    List.exists
+                      (fun x -> String.equal x (S.name name))
+                      acc_names
+                  then (
+                    Err.error err pos (EFmt.errorDuplicate name) ;
+                    typed_func :: acc )
+                  else typed_func :: acc )
+                [] funcdecls ) )
       in
       (t_funcs, {err; venv= venv_funcs; tenv; break})
   | _ -> raise NotImplemented
