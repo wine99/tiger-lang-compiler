@@ -62,18 +62,23 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           err_exp pos
       | Some tFunc -> call_exp func tFunc args pos )
     | A.OpExp {left; oper; right}
-      when List.exists (fun op -> op = oper) arithOps ->
-        let t_left = check_type (trexp left) INT EFmt.errorArith in
-        let t_right = check_type (trexp right) INT EFmt.errorArith in
-        TA.Exp
-          { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
-          ; pos
-          ; ty= INT }
+      when List.exists (fun op -> op = oper) arithOps -> (
+        let (Exp {ty= ty_left; pos= pos_left; _} as t_left) = trexp left in
+        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) = trexp right in
+        match actual_type err pos_left ty_left , actual_type err pos_right ty_right with
+        | INT , INT ->
+          TA.Exp
+            { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
+            ; pos
+            ; ty= INT }
+        | _ ->
+          Err.error err pos EFmt.errorArith ;
+          err_exp pos )
     | A.OpExp {left; oper; right}
       when List.exists (fun op -> op = oper) compOps -> (
-        let (Exp {ty= ty_left; _} as t_left) = trexp left in
-        let (Exp {ty= ty_right; _} as t_right) = trexp right in
-        match (ty_left, ty_right) with
+        let (Exp {ty= ty_left; pos= pos_left; _} as t_left) = trexp left in
+        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) = trexp right in
+        match actual_type err pos_left ty_left , actual_type err pos_right ty_right with
         | INT, INT | STRING, STRING ->
             TA.Exp
               { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
@@ -84,9 +89,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
             err_exp pos )
     | A.OpExp {left; oper; right} ->
         let (Exp {ty= ty_left; pos= pos_left; _} as t_left) = trexp left in
-        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) =
-          trexp right
-        in
+        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) = trexp right in
         if
           are_comparable err ty_left pos_left ty_right pos_right
           || ty_left != NIL || ty_right != NIL
@@ -261,13 +264,6 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
 
   (* Compute an error expression. *)
   and err_exp pos = TA.Exp {exp_base= TA.ErrorExp; pos; ty= Ty.ERROR}
-  and check_type t_exp expected_t err_type =
-    match t_exp with
-    | TA.Exp {ty; pos; _} ->
-        if ty = expected_t then t_exp
-        else (
-          Err.error err pos err_type ;
-          err_exp pos )
   (* Helper function for call expression. *)
   and call_exp func tFunc args pos =
     (* Match the types of the function. *)
