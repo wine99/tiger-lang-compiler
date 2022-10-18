@@ -26,6 +26,20 @@ exception NotImplemented
 open Ty
 open Oper
 
+open Graph
+module G = struct
+
+  module Symbol = struct
+    type t = S.symbol
+    let compare = Pervasives.compare
+    let equal = (=)
+    let hash = Hashtbl.hash
+  end
+
+  include Imperative.Digraph.ConcreteBidirectional(Symbol)
+
+end
+
 let arithOps = [PlusOp; MinusOp; TimesOp; DivideOp; ExponentOp]
 
 let compOps = [LtOp; LeOp; GtOp; GeOp]
@@ -243,7 +257,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         let t_decls = List.rev rev_t_decls in
         let (TA.Exp {ty; _} as t_body) = transExp ctx_new body in
         TA.Exp {exp_base= TA.LetExp {decls= t_decls; body= t_body}; pos; ty}
-    | _ -> raise NotImplemented
+
   (* Compute an error expression. *)
   and err_exp pos = TA.Exp {exp_base= TA.ErrorExp; pos; ty= Ty.ERROR}
   and check_type t_exp expected_t err_type =
@@ -526,7 +540,7 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
           (fun (acc_tenv, acc_refs) (A.Tdecl {name; _}) ->
             let nameptr = Ty.NAME (name, ref None) in
             ( S.enter (acc_tenv, name, nameptr)
-            , nameptr :: acc_refs ))
+            , List.append acc_refs [nameptr]))
           (tenv, []) tydecs
       in
       List.iter2
@@ -542,13 +556,24 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
         in
         (TA.TypeDec t_tydecs , {err; venv; tenv= tenv'; break})
       else (
-        (* Err.error err pos (EFmt.errorTypeDeclLoop (List.map (fun (A.Tdecl {name; _}) -> name) tydecs)) ; *)
-        raise NotImplemented ;
+        let A.Tdecl {pos; _} = List.hd tydecs in
+        Err.error err pos (EFmt.errorTypeDeclLoop (List.map (fun (A.Tdecl {name; _}) -> name) tydecs)) ;
+        raise NotImplemented
       )
 
-  | _ -> raise NotImplemented
-
-and no_cycles name_ptrs = true
+and no_cycles name_ptrs =
+  let g = G.create () in
+  List.iter
+    (fun (Ty.NAME (name, _)) -> G.add_vertex g name )
+    name_ptrs ;
+  List.iter
+    (fun (Ty.NAME (name, tyref)) ->
+      match !tyref with
+      | Some (NAME (name2, _)) -> G.add_edge g name name2
+      | _ -> ())
+    name_ptrs ;
+  let module Dfs = Traverse.Dfs(G) in
+  not (Dfs.has_cycle g)
 
 and make_type tenv = function
   | A.NameTy (ty, _) -> (
@@ -582,7 +607,9 @@ and actual_type err pos = function
 
 (** Checks if t1 is a subtype of t2 *)
 and is_subtype err t1 pos1 t2 pos2 =
-  match (actual_type err pos1 t1, actual_type err pos2 t2) with
+  let t1 = actual_type err pos1 t1 in
+  let t2 = actual_type err pos2 t2 in
+  match t1 , t2 with
   | Ty.NIL, Ty.RECORD _ -> true
   | _ -> t1 == t2
 
