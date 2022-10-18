@@ -112,8 +112,8 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
             let (Exp {ty= ty_init; pos= pos_init; _} as t_init_exp) =
               trexp init_exp
             in
-            match (ty_size, ty_init) with
-            | INT, _ when ty_init = ty ->
+            match (actual_type err pos_size ty_size, ty_init) with
+            | INT, _ when is_subtype err ty_init pos_init ty pos_init -> (* TODO double check this and recordExp *)
                 TA.Exp
                   { exp_base= TA.ArrayExp {size= t_size_exp; init= t_init_exp}
                   ; pos
@@ -141,23 +141,24 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
               err_exp pos )
             else
               let t_fields =
-                List.map
-                  (fun ff ->
-                    match ff with
+                List.map2
+                  (fun filed_given filed_expec ->
+                    match filed_given, filed_expec with
                     | (name_given, val_given), (name_expec, val_ty_expec) ->
-                        if name_given != name_expec then (
+                        if name_given <> name_expec then (
                           Err.error err pos
                             (EFmt.errorRecordFieldName name_given name_expec) ;
                           (name_given, err_exp pos) )
                         else
-                          let (TA.Exp {ty; _} as t_val) = trexp val_given in
-                          if ty != val_ty_expec then (
+                          let (TA.Exp {ty=val_ty; pos=val_pos; _} as t_val) = trexp val_given in
+                          if is_subtype err val_ty val_pos val_ty_expec val_pos then
+                            (name_given, t_val)
+                          else (
                             Err.error err pos
                               (EFmt.errorRecordFieldType name_given
-                                 val_ty_expec ty ) ;
-                            (name_given, err_exp pos) )
-                          else (name_given, t_val) )
-                  (List.combine fields_given fields_expec)
+                                 val_ty_expec val_ty ) ;
+                            (name_given, err_exp pos)))
+                  fields_given fields_expec
               in
               TA.Exp
                 {exp_base= TA.RecordExp {fields= t_fields}; pos; ty= type_rec}
