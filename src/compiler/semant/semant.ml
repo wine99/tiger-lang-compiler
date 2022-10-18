@@ -306,13 +306,13 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
     | _ -> false
   and if_exp test thn els pos =
     (* Type check test and then. *)
-    let (TA.Exp {ty= testTy; _} as t_test) = trexp test in
-    let (TA.Exp {ty= thnTy; _} as t_thn) = trexp thn in
+    let (TA.Exp {ty= testTy; pos= testPos; _} as t_test) = trexp test in
+    let (TA.Exp {ty= thnTy; pos= thnPos; _} as t_thn) = trexp thn in
     (* Check for else. *)
     match els with
     | None -> (
       (* No else statement *)
-      match (testTy, thnTy) with
+      match (actual_type err testPos testTy, thnTy) with
       | Ty.INT, Ty.VOID ->
           TA.Exp
             { exp_base= TA.IfExp {test= t_test; thn= t_thn; els= None}
@@ -326,13 +326,18 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           err_exp pos )
     | Some elsSt -> (
         (* With else statement *)
-        let (TA.Exp {ty= elsTy; _} as t_els) = trexp elsSt in
-        match (testTy, thnTy, elsTy) with
-        | Ty.INT, t1, t2 when t1 = t2 ->
+        let (TA.Exp {ty= elsTy; pos= elsPos; _} as t_els) = trexp elsSt in
+        match actual_type err testPos testTy , thnTy , elsTy with
+        | Ty.INT, _, _ when is_subtype err elsTy elsPos thnTy thnPos -> (* TODO double check this *)
             TA.Exp
               { exp_base= TA.IfExp {test= t_test; thn= t_thn; els= Some t_els}
               ; pos
               ; ty= thnTy }
+        | Ty.INT, _, _ when is_subtype err thnTy thnPos elsTy elsPos ->
+            TA.Exp
+              { exp_base= TA.IfExp {test= t_test; thn= t_thn; els= Some t_els}
+              ; pos
+              ; ty= elsTy }
         | Ty.INT, _, _ ->
             Err.error err pos (EFmt.errorIfBranchesNotSameType thnTy elsTy) ;
             err_exp pos
