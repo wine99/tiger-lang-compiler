@@ -277,23 +277,20 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
           err_exp pos )
         else
           (* Check if arguments have correct type *)
-          let typeCheckArgs = List.map (fun x -> trexp x) args in
-          let argTypes =
-            List.map
-              (fun x -> match x with TA.Exp {ty; _} -> ty)
-              typeCheckArgs
-          in
           (* Check types of arguments are the same as specified for function. *)
-          if List.equal (fun x y -> x == y) argTypes formals then
-            TA.Exp
-              { exp_base= TA.CallExp {func; args= typeCheckArgs}
-              ; pos
-              ; ty= result }
-          else (
-            (* Arguments did not match specified types. *)
-            Err.error err pos (EFmt.errorFunctionArguments func)
-            (* This should probably be another error... *) ;
-            err_exp pos )
+          let t_args = List.map2
+            (fun arg formal ->
+              let TA.Exp {ty= arg_ty; pos= arg_pos; _} as t_arg = trexp arg in
+              if is_subtype err arg_ty arg_pos formal arg_pos then t_arg
+              else (
+                Err.error err arg_pos (EFmt.errorCoercible arg_ty formal) ;
+                err_exp pos ))
+            args formals
+          in
+          TA.Exp
+            { exp_base= TA.CallExp {func; args= t_args}
+            ; pos
+            ; ty= result }
     | _ ->
         Err.error err pos (EFmt.errorUsingVariableAsFunction func) ;
         err_exp pos
