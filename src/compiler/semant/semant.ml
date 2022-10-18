@@ -92,7 +92,7 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         let (Exp {ty= ty_right; pos= pos_right; _} as t_right) = trexp right in
         if
           are_comparable err ty_left pos_left ty_right pos_right
-          || ty_left != NIL || ty_right != NIL
+          && (ty_left != NIL || ty_right != NIL)
         then
           TA.Exp
             { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
