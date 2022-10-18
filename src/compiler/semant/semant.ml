@@ -495,11 +495,11 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
             (* extend venv with the argument types for the function *)
             let venv_w_args = venv_args params in
             (* type check the body *)
-            let (TA.Exp {ty; _} as t_body) =
+            let (TA.Exp {ty; pos= pos_body;_} as t_body) =
               transExp {err; venv= venv_w_args; tenv; break= false} body
             in
             let t_res = t_result result in
-            if t_res == ty then
+            if is_subtype err ty pos_body t_res pos_body then
               TA.Fdecl
                 {name; args= t_args params; result= t_res; body= t_body; pos}
             else (
