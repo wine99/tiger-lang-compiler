@@ -179,9 +179,9 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         let t_exps, ty = t_exp exps in
         TA.Exp {exp_base= TA.SeqExp t_exps; pos; ty}
     | A.AssignExp {var; exp} ->
-        let (TA.Var {var_base; ty= varTy; _} as t_var) = trvar var in
-        let (Exp {ty= expTy; _} as t_exp) = trexp exp in
-        if varTy == expTy && assignable_var var_base then
+        let (TA.Var {var_base; ty= varTy; pos=varPos} as t_var) = trvar var in
+        let (Exp {ty= expTy; pos= expPos; _} as t_exp) = trexp exp in
+        if is_subtype err expTy expPos varTy varPos && assignable_var var_base then
           TA.Exp
             { exp_base= TA.AssignExp {var= t_var; exp= t_exp}
             ; pos
@@ -299,8 +299,8 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
     | TA.SimpleVar s -> (
       match S.look (venv, s) with
       | Some (E.VarEntry {assignable; _}) -> assignable
-      | _ -> false )
-    | _ -> false
+      | _ -> false )  (* TODO double check this *)
+    | _ -> true       (* TODO double check this *)
   and if_exp test thn els pos =
     (* Type check test and then. *)
     let (TA.Exp {ty= testTy; pos= testPos; _} as t_test) = trexp test in
