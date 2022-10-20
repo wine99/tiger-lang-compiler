@@ -544,7 +544,7 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
       in
       List.iter2
         (fun (Ty.NAME (_, tyref)) (A.Tdecl {ty; _}) ->
-          tyref := make_type tenv' ty)
+          tyref := make_type err tenv' ty)
         name_ptrs tydecs ;
       if no_cycles name_ptrs then
         let t_tydecs =
@@ -556,8 +556,13 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
         (TA.TypeDec t_tydecs , {err; venv; tenv= tenv'; break})
       else (
         let A.Tdecl {pos; _} = List.hd tydecs in
+        let t_tydecs =
+          List.map
+            (fun (A.Tdecl {name; pos; _}) -> TA.Tdecl {name; pos; ty= ERROR})
+            tydecs
+        in
         Err.error err pos (EFmt.errorTypeDeclLoop (List.map (fun (A.Tdecl {name; _}) -> name) tydecs)) ;
-        raise NotImplemented
+        (TA.TypeDec t_tydecs , {err; venv; tenv; break})
       )
 
 and no_cycles name_ptrs =
@@ -574,25 +579,29 @@ and no_cycles name_ptrs =
   let module Dfs = Traverse.Dfs(G) in
   not (Dfs.has_cycle g)
 
-and make_type tenv = function
-  | A.NameTy (ty, _) -> (
+and make_type err tenv = function
+  | A.NameTy (ty, pos) -> (
     match S.look (tenv, ty) with
-    | None -> raise NotImplemented
+    | None -> (Err.error err pos (EFmt.errorTypeDoesNotExist ty) ; None)
     | Some ty -> Some ty
   )
   | A.RecordTy fields -> (
       let t_fields =
         List.map
-          (fun (A.Field {name; typ= (ty, _); _}) ->
+          (fun (A.Field {name; typ= (ty, pos); _}) ->
             match S.look (tenv, ty) with
-            | None -> raise NotImplemented
+            | None -> (Err.error err pos (EFmt.errorTypeDoesNotExist ty) ; (name , ERROR))
             | Some ty -> (name , ty) )
           fields
-      in Some (RECORD (t_fields , mkUnique ()))
+      in
+      if List.exists (fun (_, ty) -> ty = ERROR) t_fields then
+        None
+      else
+        Some (RECORD (t_fields , mkUnique ()))
   )
-  | A.ArrayTy (ty, _) ->
+  | A.ArrayTy (ty, pos) ->
     match S.look (tenv, ty) with
-    | None -> raise NotImplemented
+    | None -> (Err.error err pos (EFmt.errorTypeDoesNotExist ty) ; None)
     | Some ty -> Some (ARRAY (ty , mkUnique ()))
 
 and actual_type err pos = function
