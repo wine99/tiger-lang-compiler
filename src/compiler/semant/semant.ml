@@ -44,6 +44,13 @@ let arithOps = [PlusOp; MinusOp; TimesOp; DivideOp; ExponentOp]
 
 let compOps = [LtOp; LeOp; GtOp; GeOp]
 
+let rec dup_elem names positions =
+  match names , positions with
+  | [] , [] -> None
+  | h1 :: t1 , h2 :: t2 ->
+    if List.mem h1 t1 then Some (h1 , h2) else dup_elem t1 t2
+  | _ -> failwith "wrong usage of dup_elem"
+
 let rec transExp ({err; venv; tenv; break} as ctx : context) e =
   let rec trexp (A.Exp {exp_base; pos}) : TA.exp =
     match exp_base with
@@ -539,36 +546,40 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
       in
       (t_funcs, {err; venv= venv_funcs; tenv; break})
   | A.TypeDec tydecs ->
-      let tenv', name_ptrs =
-        List.fold_left
-          (fun (acc_tenv, acc_refs) (A.Tdecl {name; _}) ->
-            let nameptr = Ty.NAME (name, ref None) in
-            ( S.enter (acc_tenv, name, nameptr)
-            , List.append acc_refs [nameptr]))
-          (tenv, []) tydecs
-      in
-      List.iter2
-        (fun (Ty.NAME (_, tyref)) (A.Tdecl {ty; _}) ->
-          tyref := make_type err tenv' ty)
-        name_ptrs tydecs ;
-      if no_cycles name_ptrs then
-        let t_tydecs =
-          List.map2
-            (fun name_ptr (A.Tdecl {name; pos; _}) ->
-              TA.Tdecl {name; pos; ty=name_ptr})
-            name_ptrs tydecs
-        in
-        (TA.TypeDec t_tydecs , {err; venv; tenv= tenv'; break})
-      else (
-        let A.Tdecl {pos; _} = List.hd tydecs in
-        let t_tydecs =
-          List.map
-            (fun (A.Tdecl {name; pos; _}) -> TA.Tdecl {name; pos; ty= ERROR})
-            tydecs
-        in
-        Err.error err pos (EFmt.errorTypeDeclLoop (List.map (fun (A.Tdecl {name; _}) -> name) tydecs)) ;
-        (TA.TypeDec t_tydecs , {err; venv; tenv; break})
-      )
+      let names , poses =
+        List.split (List.map (fun (A.Tdecl {name; pos; _}) -> name , pos) tydecs) in
+      let t_tydecs =
+        List.map2 (fun name pos -> TA.Tdecl {name; pos; ty= ERROR}) names poses in
+      match dup_elem names poses with
+      | Some (name , pos) ->
+          Err.error err pos (EFmt.errorDuplicate name) ;
+          (TA.TypeDec t_tydecs , {err; venv; tenv; break})
+      | None ->
+          let tenv', name_ptrs =
+            List.fold_left
+              (fun (acc_tenv, acc_refs) name ->
+                let nameptr = Ty.NAME (name, ref None) in
+                ( S.enter (acc_tenv, name, nameptr)
+                , List.append acc_refs [nameptr]))
+              (tenv, []) names
+          in
+          List.iter2
+            (fun (Ty.NAME (_, tyref)) (A.Tdecl {ty; _}) ->
+              tyref := make_type err tenv' ty)
+            name_ptrs tydecs ;
+          if no_cycles name_ptrs then
+            let t_tydecs =
+              List.map2
+                (fun name_ptr (A.Tdecl {name; pos; _}) ->
+                  TA.Tdecl {name; pos; ty=name_ptr})
+                name_ptrs tydecs
+            in
+            (TA.TypeDec t_tydecs , {err; venv; tenv= tenv'; break})
+          else (
+            let A.Tdecl {pos; _} = List.hd tydecs in
+            Err.error err pos (EFmt.errorTypeDeclLoop (List.map (fun (A.Tdecl {name; _}) -> name) tydecs)) ;
+            (TA.TypeDec t_tydecs , {err; venv; tenv; break})
+          )
 
 and no_cycles name_ptrs =
   let g = G.create () in
@@ -591,18 +602,25 @@ and make_type err tenv = function
     | Some ty -> Some ty
   )
   | A.RecordTy fields -> (
-      let t_fields =
-        List.map
-          (fun (A.Field {name; typ= (ty, pos); _}) ->
-            match S.look (tenv, ty) with
-            | None -> (Err.error err pos (EFmt.errorTypeDoesNotExist ty) ; (name , ERROR))
-            | Some ty -> (name , ty) )
-          fields
-      in
-      if List.exists (fun (_, ty) -> ty = ERROR) t_fields then
-        None
-      else
-        Some (RECORD (t_fields , mkUnique ()))
+      let names , poses =
+        List.split (List.map (fun (A.Field {name; pos; _}) -> name , pos) fields) in
+      match dup_elem names poses with
+      | Some (name , pos) ->
+          Err.error err pos (EFmt.errorDuplicate name) ;
+          None
+      | None ->
+          let t_fields =
+            List.map
+              (fun (A.Field {name; typ= (ty, pos); _}) ->
+                match S.look (tenv, ty) with
+                | None -> (Err.error err pos (EFmt.errorTypeDoesNotExist ty) ; (name , ERROR))
+                | Some ty -> (name , ty) )
+              fields
+          in
+          if List.exists (fun (_, ty) -> ty = ERROR) t_fields then
+            None
+          else
+            Some (RECORD (t_fields , mkUnique ()))
   )
   | A.ArrayTy (ty, pos) ->
     match S.look (tenv, ty) with
