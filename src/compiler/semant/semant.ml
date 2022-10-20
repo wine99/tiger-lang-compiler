@@ -177,8 +177,13 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
               let (TA.Exp {ty; _} as t_exp) = trexp exp in
               ([t_exp], ty)
           | exp :: exps ->
+              let TA.Exp {ty= ty_hd; pos= pos_hd; _} as hd = trexp exp in
               let t_exps, ty = t_exp exps in
-              (trexp exp :: t_exps, ty)
+              if ty_hd = NIL then (
+                Err.error err pos_hd EFmt.errorInferNilType ;
+                (err_exp pos_hd :: t_exps, ty)
+              ) else
+                (hd :: t_exps, ty)
         in
         let t_exps, ty = t_exp exps in
         TA.Exp {exp_base= TA.SeqExp t_exps; pos; ty}
@@ -629,4 +634,6 @@ and are_comparable err t1 pos1 t2 pos2 =
 
 let transProg (e : A.exp) : TA.exp * Err.errenv =
   let err = Err.initial_env in
-  (transExp {venv= E.baseVenv; tenv= E.baseTenv; err; break= false} e, err)
+  let TA.Exp {ty; pos; _} as t_exp = transExp {venv= E.baseVenv; tenv= E.baseTenv; err; break= false} e in
+  if ty = NIL then Err.error err pos EFmt.errorInferNilType ;
+  (t_exp , err)
