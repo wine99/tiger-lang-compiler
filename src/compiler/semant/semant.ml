@@ -31,7 +31,7 @@ module G = struct
 
   module Symbol = struct
     type t = S.symbol
-    let compare = Pervasives.compare
+    let compare = Stdlib.compare
     let equal = (=)
     let hash = Hashtbl.hash
   end
@@ -564,7 +564,7 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
               (tenv, []) names
           in
           List.iter2
-            (fun (Ty.NAME (_, tyref)) (A.Tdecl {ty; _}) ->
+            (fun [@warning "-8"] (Ty.NAME (_, tyref)) (A.Tdecl {ty; _}) ->
               tyref := make_type err tenv' ty)
             name_ptrs tydecs ;
           if no_cycles name_ptrs then
@@ -584,10 +584,10 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
 and no_cycles name_ptrs =
   let g = G.create () in
   List.iter
-    (fun (Ty.NAME (name, _)) -> G.add_vertex g name )
+    (fun [@warning "-8"] (Ty.NAME (name, _)) -> G.add_vertex g name )
     name_ptrs ;
   List.iter
-    (fun (Ty.NAME (name, tyref)) ->
+    (fun [@warning "-8"] (Ty.NAME (name, tyref)) ->
       match !tyref with
       | Some (NAME (name2, _)) -> G.add_edge g name name2
       | _ -> ())
