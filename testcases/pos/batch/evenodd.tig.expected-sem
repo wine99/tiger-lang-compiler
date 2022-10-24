@@ -1,16 +1,49 @@
-let
-  function even( x : int ) : int = (
-    if x == 0 then
-      1
-    else
-      odd( x - 1 )
-  )
-  function odd( x : int ) : int = (
-    if x == 0 then
-      0
-    else
-      1
-  )
-in
-even(5)
-end
+(INT,
+  LetExp([
+  | FunctionDec[
+  |   (even,[
+  |   | (x,true)],
+  |   | INT,
+  |   | (INT,
+  |   |   IfExp(
+  |   |   | (INT,
+  |   |   |   OpExp(EqOp,
+  |   |   |   | (INT,
+  |   |   |   |   VarExp(
+  |   |   |   |   | (INT,
+  |   |   |   |   |   SimpleVar(x)))),
+  |   |   |   | (INT,
+  |   |   |   |   IntExp(0)))),
+  |   |   | (INT,
+  |   |   |   IntExp(1)),
+  |   |   | (INT,
+  |   |   |   CallExp(odd,[
+  |   |   |   | (INT,
+  |   |   |   |   OpExp(MinusOp,
+  |   |   |   |   | (INT,
+  |   |   |   |   |   VarExp(
+  |   |   |   |   |   | (INT,
+  |   |   |   |   |   |   SimpleVar(x)))),
+  |   |   |   |   | (INT,
+  |   |   |   |   |   IntExp(1))))]))))),
+  |   (odd,[
+  |   | (x,true)],
+  |   | INT,
+  |   | (INT,
+  |   |   IfExp(
+  |   |   | (INT,
+  |   |   |   OpExp(EqOp,
+  |   |   |   | (INT,
+  |   |   |   |   VarExp(
+  |   |   |   |   | (INT,
+  |   |   |   |   |   SimpleVar(x)))),
+  |   |   |   | (INT,
+  |   |   |   |   IntExp(0)))),
+  |   |   | (INT,
+  |   |   |   IntExp(0)),
+  |   |   | (INT,
+  |   |   |   IntExp(1)))))]],
+  | (INT,
+  |   CallExp(even,[
+  |   | (INT,
+  |   |   IntExp(5))]))))

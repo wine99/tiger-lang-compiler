@@ -546,7 +546,7 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
               (fun name (acc_tenv, acc_refs) ->
                 let nameptr = Ty.NAME (name, ref None) in
                 ( S.enter (acc_tenv, name, nameptr)
-                , List.append acc_refs [nameptr]))
+                , nameptr :: acc_refs))
               names (tenv, [])
           in
           List.iter2
