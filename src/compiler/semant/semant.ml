@@ -31,10 +31,10 @@ let arithOps = [PlusOp; MinusOp; TimesOp; DivideOp; ExponentOp]
 let compOps = [LtOp; LeOp; GtOp; GeOp]
 
 let rec dup_elem names positions =
-  match names , positions with
-  | [] , [] -> None
-  | h1 :: t1 , h2 :: t2 ->
-    if List.mem h1 t1 then Some (h1 , h2) else dup_elem t1 t2
+  match (names, positions) with
+  | [], [] -> None
+  | h1 :: t1, h2 :: t2 ->
+      if List.mem h1 t1 then Some (h1, h2) else dup_elem t1 t2
   | _ -> failwith "wrong usage of dup_elem"
 
 let rec transExp ({err; venv; tenv; break} as ctx : context) e =
@@ -57,21 +57,31 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
     | A.OpExp {left; oper; right}
       when List.exists (fun op -> op = oper) arithOps -> (
         let (Exp {ty= ty_left; pos= pos_left; _} as t_left) = trexp left in
-        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) = trexp right in
-        match actual_type err pos_left ty_left , actual_type err pos_right ty_right with
-        | INT , INT ->
-          TA.Exp
-            { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
-            ; pos
-            ; ty= INT }
+        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) =
+          trexp right
+        in
+        match
+          ( actual_type err pos_left ty_left
+          , actual_type err pos_right ty_right )
+        with
+        | INT, INT ->
+            TA.Exp
+              { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
+              ; pos
+              ; ty= INT }
         | _ ->
-          Err.error err pos EFmt.errorArith ;
-          err_exp pos )
+            Err.error err pos EFmt.errorArith ;
+            err_exp pos )
     | A.OpExp {left; oper; right}
       when List.exists (fun op -> op = oper) compOps -> (
         let (Exp {ty= ty_left; pos= pos_left; _} as t_left) = trexp left in
-        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) = trexp right in
-        match actual_type err pos_left ty_left , actual_type err pos_right ty_right with
+        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) =
+          trexp right
+        in
+        match
+          ( actual_type err pos_left ty_left
+          , actual_type err pos_right ty_right )
+        with
         | INT, INT | STRING, STRING ->
             TA.Exp
               { exp_base= TA.OpExp {left= t_left; oper; right= t_right}
@@ -82,7 +92,9 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
             err_exp pos )
     | A.OpExp {left; oper; right} ->
         let (Exp {ty= ty_left; pos= pos_left; _} as t_left) = trexp left in
-        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) = trexp right in
+        let (Exp {ty= ty_right; pos= pos_right; _} as t_right) =
+          trexp right
+        in
         if
           are_comparable err ty_left pos_left ty_right pos_right
           && (ty_left != NIL || ty_right != NIL)
@@ -109,7 +121,8 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
               trexp init_exp
             in
             match (actual_type err pos_size ty_size, ty_init) with
-            | INT, _ when is_subtype err ty_init pos_init ty pos_init -> (* TODO double check this and recordExp *)
+            | INT, _ when is_subtype err ty_init pos_init ty pos_init ->
+                (* TODO double check this and recordExp *)
                 TA.Exp
                   { exp_base= TA.ArrayExp {size= t_size_exp; init= t_init_exp}
                   ; pos
@@ -139,21 +152,26 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
               let t_fields =
                 List.map2
                   (fun filed_given filed_expec ->
-                    match filed_given, filed_expec with
+                    match (filed_given, filed_expec) with
                     | (name_given, val_given), (name_expec, val_ty_expec) ->
                         if name_given <> name_expec then (
                           Err.error err pos
                             (EFmt.errorRecordFieldName name_given name_expec) ;
                           (name_given, err_exp pos) )
                         else
-                          let (TA.Exp {ty=val_ty; pos=val_pos; _} as t_val) = trexp val_given in
-                          if is_subtype err val_ty val_pos val_ty_expec val_pos then
-                            (name_given, t_val)
+                          let (TA.Exp {ty= val_ty; pos= val_pos; _} as t_val)
+                              =
+                            trexp val_given
+                          in
+                          if
+                            is_subtype err val_ty val_pos val_ty_expec
+                              val_pos
+                          then (name_given, t_val)
                           else (
                             Err.error err pos
                               (EFmt.errorRecordFieldType name_given
                                  val_ty_expec val_ty ) ;
-                            (name_given, err_exp pos)))
+                            (name_given, err_exp pos) ) )
                   fields_given fields_expec
               in
               TA.Exp
@@ -170,20 +188,23 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
               let (TA.Exp {ty; _} as t_exp) = trexp exp in
               ([t_exp], ty)
           | exp :: exps ->
-              let TA.Exp {ty= ty_hd; pos= pos_hd; _} as hd = trexp exp in
+              let (TA.Exp {ty= ty_hd; pos= pos_hd; _} as hd) = trexp exp in
               let t_exps, ty = t_exp exps in
               if ty_hd = NIL then (
                 Err.error err pos_hd EFmt.errorInferNilType ;
-                (err_exp pos_hd :: t_exps, ty)
-              ) else
-                (hd :: t_exps, ty)
+                (err_exp pos_hd :: t_exps, ty) )
+              else (hd :: t_exps, ty)
         in
         let t_exps, ty = t_exp exps in
         TA.Exp {exp_base= TA.SeqExp t_exps; pos; ty}
     | A.AssignExp {var; exp} ->
-        let (TA.Var {var_base; ty= varTy; pos=varPos} as t_var) = trvar var in
+        let (TA.Var {var_base; ty= varTy; pos= varPos} as t_var) =
+          trvar var
+        in
         let (Exp {ty= expTy; pos= expPos; _} as t_exp) = trexp exp in
-        if is_subtype err expTy expPos varTy varPos && assignable_var var_base then
+        if
+          is_subtype err expTy expPos varTy varPos && assignable_var var_base
+        then
           TA.Exp
             { exp_base= TA.AssignExp {var= t_var; exp= t_exp}
             ; pos
@@ -259,7 +280,6 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         let t_decls = List.rev rev_t_decls in
         let (TA.Exp {ty; _} as t_body) = transExp ctx_new body in
         TA.Exp {exp_base= TA.LetExp {decls= t_decls; body= t_body}; pos; ty}
-
   (* Compute an error expression. *)
   and err_exp pos = TA.Exp {exp_base= TA.ErrorExp; pos; ty= Ty.ERROR}
   (* Helper function for call expression. *)
@@ -273,19 +293,19 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         else
           (* Check if arguments have correct type *)
           (* Check types of arguments are the same as specified for function. *)
-          let t_args = List.map2
-            (fun arg formal ->
-              let TA.Exp {ty= arg_ty; pos= arg_pos; _} as t_arg = trexp arg in
-              if is_subtype err arg_ty arg_pos formal arg_pos then t_arg
-              else (
-                Err.error err arg_pos (EFmt.errorCoercible arg_ty formal) ;
-                err_exp pos ))
-            args formals
+          let t_args =
+            List.map2
+              (fun arg formal ->
+                let (TA.Exp {ty= arg_ty; pos= arg_pos; _} as t_arg) =
+                  trexp arg
+                in
+                if is_subtype err arg_ty arg_pos formal arg_pos then t_arg
+                else (
+                  Err.error err arg_pos (EFmt.errorCoercible arg_ty formal) ;
+                  err_exp pos ) )
+              args formals
           in
-          TA.Exp
-            { exp_base= TA.CallExp {func; args= t_args}
-            ; pos
-            ; ty= result }
+          TA.Exp {exp_base= TA.CallExp {func; args= t_args}; pos; ty= result}
     | _ ->
         Err.error err pos (EFmt.errorUsingVariableAsFunction func) ;
         err_exp pos
@@ -294,8 +314,8 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
     | TA.SimpleVar s -> (
       match S.look (venv, s) with
       | Some (E.VarEntry {assignable; _}) -> assignable
-      | _ -> false )  (* TODO double check this *)
-    | _ -> true       (* TODO double check this *)
+      | _ -> false (* TODO double check this *) )
+    | _ -> true (* TODO double check this *)
   and if_exp test thn els pos =
     (* Type check test and then. *)
     let (TA.Exp {ty= testTy; pos= testPos; _} as t_test) = trexp test in
@@ -319,8 +339,9 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
     | Some elsSt -> (
         (* With else statement *)
         let (TA.Exp {ty= elsTy; pos= elsPos; _} as t_els) = trexp elsSt in
-        match actual_type err testPos testTy , thnTy , elsTy with
-        | Ty.INT, _, _ when is_subtype err elsTy elsPos thnTy thnPos -> (* TODO double check this *)
+        match (actual_type err testPos testTy, thnTy, elsTy) with
+        | Ty.INT, _, _ when is_subtype err elsTy elsPos thnTy thnPos ->
+            (* TODO double check this *)
             TA.Exp
               { exp_base= TA.IfExp {test= t_test; thn= t_thn; els= Some t_els}
               ; pos
@@ -492,7 +513,7 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
             (* extend venv with the argument types for the function *)
             let venv_w_args = venv_args params in
             (* type check the body *)
-            let (TA.Exp {ty; pos= pos_body;_} as t_body) =
+            let (TA.Exp {ty; pos= pos_body; _} as t_body) =
               transExp {err; venv= venv_w_args; tenv; break= false} body
             in
             let t_res = t_result result in
@@ -531,100 +552,107 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
                 [] funcdecls ) )
       in
       (t_funcs, {err; venv= venv_funcs; tenv; break})
-  | A.TypeDec tydecs ->
-      let names , poses =
-        List.split (List.map (fun (A.Tdecl {name; pos; _}) -> name , pos) tydecs) in
+  | A.TypeDec tydecs -> (
+      let names, poses =
+        List.split
+          (List.map (fun (A.Tdecl {name; pos; _}) -> (name, pos)) tydecs)
+      in
       let t_tydecs =
-        List.map2 (fun name pos -> TA.Tdecl {name; pos; ty= ERROR}) names poses in
+        List.map2
+          (fun name pos -> TA.Tdecl {name; pos; ty= ERROR})
+          names poses
+      in
       match dup_elem names poses with
-      | Some (name , pos) ->
+      | Some (name, pos) ->
           Err.error err pos (EFmt.errorDuplicate name) ;
-          (TA.TypeDec t_tydecs , {err; venv; tenv; break})
+          (TA.TypeDec t_tydecs, {err; venv; tenv; break})
       | None ->
           let tenv', name_ptrs =
             List.fold_right
               (fun name (acc_tenv, acc_refs) ->
                 let nameptr = Ty.NAME (name, ref None) in
-                ( S.enter (acc_tenv, name, nameptr)
-                , nameptr :: acc_refs))
+                (S.enter (acc_tenv, name, nameptr), nameptr :: acc_refs) )
               names (tenv, [])
           in
           List.iter2
             (fun [@warning "-8"] (Ty.NAME (_, tyref)) (A.Tdecl {ty; _}) ->
-              tyref := mk_type err tenv' ty)
+              tyref := mk_type err tenv' ty )
             name_ptrs tydecs ;
           if no_cycles name_ptrs then
             let t_tydecs =
               List.map2
                 (fun name_ptr (A.Tdecl {name; pos; _}) ->
-                  TA.Tdecl {name; pos; ty=name_ptr})
+                  TA.Tdecl {name; pos; ty= name_ptr} )
                 name_ptrs tydecs
             in
-            (TA.TypeDec t_tydecs , {err; venv; tenv= tenv'; break})
-          else (
-            let A.Tdecl {pos; _} = List.hd tydecs in
-            Err.error err pos (EFmt.errorTypeDeclLoop (List.map (fun (A.Tdecl {name; _}) -> name) tydecs)) ;
-            (TA.TypeDec t_tydecs , {err; venv; tenv; break})
-          )
+            (TA.TypeDec t_tydecs, {err; venv; tenv= tenv'; break})
+          else
+            let (A.Tdecl {pos; _}) = List.hd tydecs in
+            Err.error err pos
+              (EFmt.errorTypeDeclLoop
+                 (List.map (fun (A.Tdecl {name; _}) -> name) tydecs) ) ;
+            (TA.TypeDec t_tydecs, {err; venv; tenv; break}) )
 
-and no_cycles name_ptrs = (
-  let eq_own_type self = (
-    let rec eq_self acc = (
+and no_cycles name_ptrs =
+  let eq_own_type self =
+    let rec eq_self acc =
       match acc with
       | NAME (_, opt_ty_ref) -> (
         match !opt_ty_ref with
-        | None   -> false
+        | None -> false
         | Some a -> (
           match (self, a) with
-          | (NAME (sym_self, _), NAME (sym_a, _)) -> if sym_self = sym_a then true else eq_self a
-          | _                                     -> false
-        ))
+          | NAME (sym_self, _), NAME (sym_a, _) ->
+              if sym_self = sym_a then true else eq_self a
+          | _ -> false ) )
       | _ -> false
-    ) in eq_self self
-  ) in
-  let rec has_cycles ls = (
+    in
+    eq_self self
+  in
+  let rec has_cycles ls =
     match ls with
-    | []                -> false
-    | hd_ptr :: tl_ptrs -> (
-      let cycle = eq_own_type hd_ptr in
-      if cycle then true else has_cycles tl_ptrs
-      )
-  )
+    | [] -> false
+    | hd_ptr :: tl_ptrs ->
+        let cycle = eq_own_type hd_ptr in
+        if cycle then true else has_cycles tl_ptrs
   in
   not (has_cycles name_ptrs)
-)
 
 and mk_type err tenv = function
   | A.NameTy (ty, pos) -> (
     match S.look (tenv, ty) with
-    | None -> (Err.error err pos (EFmt.errorTypeDoesNotExist ty) ; None)
-    | Some ty -> Some ty
-  )
+    | None ->
+        Err.error err pos (EFmt.errorTypeDoesNotExist ty) ;
+        None
+    | Some ty -> Some ty )
   | A.RecordTy fields -> (
-      let names , poses =
-        List.split (List.map (fun (A.Field {name; pos; _}) -> name , pos) fields) in
+      let names, poses =
+        List.split
+          (List.map (fun (A.Field {name; pos; _}) -> (name, pos)) fields)
+      in
       match dup_elem names poses with
-      | Some (name , pos) ->
+      | Some (name, pos) ->
           Err.error err pos (EFmt.errorDuplicate name) ;
           None
       | None ->
           let t_fields =
             List.map
-              (fun (A.Field {name; typ= (ty, pos); _}) ->
+              (fun (A.Field {name; typ= ty, pos; _}) ->
                 match S.look (tenv, ty) with
-                | None -> (Err.error err pos (EFmt.errorTypeDoesNotExist ty) ; (name , ERROR))
-                | Some ty -> (name , ty) )
+                | None ->
+                    Err.error err pos (EFmt.errorTypeDoesNotExist ty) ;
+                    (name, ERROR)
+                | Some ty -> (name, ty) )
               fields
           in
-          if List.exists (fun (_, ty) -> ty = ERROR) t_fields then
-            None
-          else
-            Some (RECORD (t_fields , mkUnique ()))
-  )
-  | A.ArrayTy (ty, pos) ->
+          if List.exists (fun (_, ty) -> ty = ERROR) t_fields then None
+          else Some (RECORD (t_fields, mkUnique ())) )
+  | A.ArrayTy (ty, pos) -> (
     match S.look (tenv, ty) with
-    | None -> (Err.error err pos (EFmt.errorTypeDoesNotExist ty) ; None)
-    | Some ty -> Some (ARRAY (ty , mkUnique ()))
+    | None ->
+        Err.error err pos (EFmt.errorTypeDoesNotExist ty) ;
+        None
+    | Some ty -> Some (ARRAY (ty, mkUnique ())) )
 
 and actual_type err pos = function
   | NAME (sym, opt_ty_ref) -> (
@@ -639,28 +667,25 @@ and actual_type err pos = function
 and is_subtype err t1 pos1 t2 pos2 =
   let t1 = actual_type err pos1 t1 in
   let t2 = actual_type err pos2 t2 in
-  match t1 , t2 with
-  | Ty.NIL, Ty.RECORD _ -> true
-  | _ -> t1 == t2
+  match (t1, t2) with Ty.NIL, Ty.RECORD _ -> true | _ -> t1 == t2
 
 and are_comparable err t1 pos1 t2 pos2 =
   t1 != Ty.VOID
   && (is_subtype err t1 pos1 t2 pos2 || is_subtype err t2 pos2 t1 pos1)
 
 and mkType tenv = function
-| Ty.NAME (s, _) -> (
-  match S.look (tenv, s) with
-  | Some t -> t
-  | None -> raise NotImplemented
-  )
-| Ty.RECORD (tys, uniq) -> raise NotImplemented
-| Ty.ARRAY (t, uniq) -> raise NotImplemented
-| _ -> raise NotImplemented
+  | Ty.NAME (s, _) -> (
+    match S.look (tenv, s) with Some t -> t | None -> raise NotImplemented )
+  | Ty.RECORD (tys, uniq) -> raise NotImplemented
+  | Ty.ARRAY (t, uniq) -> raise NotImplemented
+  | _ -> raise NotImplemented
 
 (* no need to change the implementation of the top level function *)
 
 let transProg (e : A.exp) : TA.exp * Err.errenv =
   let err = Err.initial_env in
-  let TA.Exp {ty; pos; _} as t_exp = transExp {venv= E.baseVenv; tenv= E.baseTenv; err; break= false} e in
+  let (TA.Exp {ty; pos; _} as t_exp) =
+    transExp {venv= E.baseVenv; tenv= E.baseTenv; err; break= false} e
+  in
   if ty = NIL then Err.error err pos EFmt.errorInferNilType ;
-  (t_exp , err)
+  (t_exp, err)
