@@ -434,15 +434,6 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
       | None ->
           Err.error err tp @@ EFmt.errorTypeDoesNotExist t ;
           (TA.VarDec {name; escape; typ= Ty.ERROR; init= texp; pos}, ctx) )
-  | A.TypeDec tydecs ->
-      let tenv', refs =
-        List.fold_left
-          (fun (tenv1, refs) (A.Tdecl {name; _}) ->
-            ( S.enter (tenv1, name, Ty.NAME (name, ref None))
-            , Ty.NAME (name, ref None) :: refs ) )
-          (tenv, []) tydecs
-      in
-      raise NotImplemented
   | A.FunctionDec funcdecls ->
       (* Helper functions *)
       (* Convert field data entry to typed field data entry *)
@@ -459,7 +450,7 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
       let t_args params =
         List.fold_right (fun arg acc -> t_arg arg :: acc) params []
       in
-      (* Lookup given return type of function *)
+      (* Look up given return type of function *)
       let t_result = function
         | Some (sym, pos) -> (
           match S.look (tenv, sym) with
@@ -469,7 +460,7 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
               Ty.ERROR (* result type not defined *) )
         | None -> Ty.VOID (* no annotation => void return type *)
       in
-      (* Extent venv with given funcdecl *)
+      (* Extend venv with given funcdecl *)
       let venv_func venv = function
         | A.Fdecl {name; params; result; _} ->
             let t_args =
@@ -484,14 +475,14 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
               , name
               , E.FunEntry {formals= t_args; result= t_result result} )
       in
-      (* Extent venv with funcdecls *)
+      (* Extend venv with funcdecls *)
       let venv_funcs = List.fold_left venv_func venv funcdecls in
-      (* Extent venv with argument *)
+      (* Extend venv with argument *)
       let venv_arg venv_args arg =
         let (TA.Arg {name; ty; _}) = t_arg arg in
         S.enter (venv_args, name, E.VarEntry {assignable= true; ty})
       in
-      (* Extent venv with arguments *)
+      (* Extend venv with arguments *)
       let venv_args args =
         List.fold_left (fun acc arg -> venv_arg acc arg) venv_funcs args
       in
@@ -551,16 +542,16 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
           (TA.TypeDec t_tydecs , {err; venv; tenv; break})
       | None ->
           let tenv', name_ptrs =
-            List.fold_left
-              (fun (acc_tenv, acc_refs) name ->
+            List.fold_right
+              (fun name (acc_tenv, acc_refs) ->
                 let nameptr = Ty.NAME (name, ref None) in
                 ( S.enter (acc_tenv, name, nameptr)
                 , List.append acc_refs [nameptr]))
-              (tenv, []) names
+              names (tenv, [])
           in
           List.iter2
             (fun [@warning "-8"] (Ty.NAME (_, tyref)) (A.Tdecl {ty; _}) ->
-              tyref := make_type err tenv' ty)
+              tyref := mk_type err tenv' ty)
             name_ptrs tydecs ;
           if no_cycles name_ptrs then
             let t_tydecs =
@@ -603,7 +594,7 @@ and no_cycles name_ptrs = (
   not (has_cycles name_ptrs)
 )
 
-and make_type err tenv = function
+and mk_type err tenv = function
   | A.NameTy (ty, pos) -> (
     match S.look (tenv, ty) with
     | None -> (Err.error err pos (EFmt.errorTypeDoesNotExist ty) ; None)
