@@ -20,9 +20,6 @@ type context =
   ; break: bool (* β from our formal typing rules *)
   ; err: Err.errenv (* error environment *) }
 
-exception NotImplemented
-(* the final code should work without this exception *)
-
 open Ty
 open Oper
 
@@ -671,13 +668,6 @@ and is_subtype err t1 pos1 t2 pos2 =
 and are_comparable err t1 pos1 t2 pos2 =
   t1 != Ty.VOID
   && (is_subtype err t1 pos1 t2 pos2 || is_subtype err t2 pos2 t1 pos1)
-
-and mkType tenv = function
-  | Ty.NAME (s, _) -> (
-    match S.look (tenv, s) with Some t -> t | None -> raise NotImplemented )
-  | Ty.RECORD (tys, uniq) -> raise NotImplemented
-  | Ty.ARRAY (t, uniq) -> raise NotImplemented
-  | _ -> raise NotImplemented
 
 (* no need to change the implementation of the top level function *)
 
