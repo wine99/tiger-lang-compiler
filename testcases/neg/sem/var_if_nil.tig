@@ -1,0 +1,8 @@
+let
+  type a = {}
+  var true := 1
+  var false := 0
+  var v := if true then nil else nil
+in
+  v
+end
