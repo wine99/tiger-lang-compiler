@@ -371,7 +371,6 @@ let rec transExp ({err; venv; tenv; break} as ctx : context) e =
         match ent with
         | VarEntry {ty; _} -> TA.Var {var_base= TA.SimpleVar s; pos; ty}
         | FunEntry _ ->
-            (*  *)
             Err.error err pos (EFmt.errorUsingFunctionAsVariable s) ;
             TA.Var {var_base= TA.SimpleVar s; pos; ty= Ty.ERROR} ) )
     (* FieldVar, i.e. `record.field` *)
