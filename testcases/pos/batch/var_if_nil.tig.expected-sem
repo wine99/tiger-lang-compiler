@@ -1,0 +1,26 @@
+(NAME a = RECORD {},
+  LetExp([
+  | TypeDec[
+  |   (a,
+  |   | NAME a = RECORD {})],
+  | VarDec(true,true,INT,
+  |   (INT,
+  |   | IntExp(1))),
+  | VarDec(false,true,INT,
+  |   (INT,
+  |   | IntExp(0))),
+  | VarDec(v,true,NAME a = RECORD {},
+  |   (NAME a = RECORD {},
+  |   | IfExp(
+  |   |   (INT,
+  |   |   | VarExp(
+  |   |   |   (INT,
+  |   |   |   | SimpleVar(true)))),
+  |   |   (NAME a = RECORD {},
+  |   |   | RecordExp([])),
+  |   |   (NIL,
+  |   |   | NilExp))))],
+  | (NAME a = RECORD {},
+  |   VarExp(
+  |   | (NAME a = RECORD {},
+  |   |   SimpleVar(v))))))
