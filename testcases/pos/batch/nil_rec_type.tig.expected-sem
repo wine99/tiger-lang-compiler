@@ -1,0 +1,25 @@
+(VOID,
+  LetExp([
+  | TypeDec[
+  |   (a,
+  |   | NAME a = RECORD {}),
+  |   (b,
+  |   | NAME b = NAME a)],
+  | FunctionDec[
+  |   (f,[],
+  |   | NAME a = RECORD {},
+  |   | (NAME a = RECORD {},
+  |   |   RecordExp([]))),
+  |   (g,[],
+  |   | NAME b = NAME a,
+  |   | (NIL,
+  |   |   NilExp))],
+  | VarDec(x,true,NAME a = RECORD {},
+  |   (NAME a = RECORD {},
+  |   | CallExp(f,[])))],
+  | (VOID,
+  |   AssignExp(
+  |   | (NAME a = RECORD {},
+  |   |   SimpleVar(x)),
+  |   | (NAME b = NAME a,
+  |   |   CallExp(g,[]))))))

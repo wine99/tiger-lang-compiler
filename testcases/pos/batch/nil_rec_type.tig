@@ -1,0 +1,9 @@
+let
+type a = {}
+type b = a
+function f(): a = a{}
+function g(): b = nil
+var x := f()
+in
+x := g()
+end
