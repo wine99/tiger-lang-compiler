@@ -26,20 +26,6 @@ exception NotImplemented
 open Ty
 open Oper
 
-open Graph
-module G = struct
-
-  module Symbol = struct
-    type t = S.symbol
-    let compare = Stdlib.compare
-    let equal = (=)
-    let hash = Hashtbl.hash
-  end
-
-  include Imperative.Digraph.ConcreteBidirectional(Symbol)
-
-end
-
 let arithOps = [PlusOp; MinusOp; TimesOp; DivideOp; ExponentOp]
 
 let compOps = [LtOp; LeOp; GtOp; GeOp]
@@ -590,19 +576,32 @@ and transDecl ({err; venv; tenv; break} as ctx : context) dec :
             (TA.TypeDec t_tydecs , {err; venv; tenv; break})
           )
 
-and no_cycles name_ptrs =
-  let g = G.create () in
-  List.iter
-    (fun [@warning "-8"] (Ty.NAME (name, _)) -> G.add_vertex g name )
-    name_ptrs ;
-  List.iter
-    (fun [@warning "-8"] (Ty.NAME (name, tyref)) ->
-      match !tyref with
-      | Some (NAME (name2, _)) -> G.add_edge g name name2
-      | _ -> ())
-    name_ptrs ;
-  let module Dfs = Traverse.Dfs(G) in
-  not (Dfs.has_cycle g)
+and no_cycles name_ptrs = (
+  let eq_own_type self = (
+    let rec eq_self acc = (
+      match acc with
+      | NAME (_, opt_ty_ref) -> (
+        match !opt_ty_ref with
+        | None   -> false
+        | Some a -> (
+          match (self, a) with
+          | (NAME (sym_self, _), NAME (sym_a, _)) -> if sym_self = sym_a then true else eq_self a
+          | _                                     -> false
+        ))
+      | _ -> false
+    ) in eq_self self
+  ) in
+  let rec has_cycles ls = (
+    match ls with
+    | []                -> false
+    | hd_ptr :: tl_ptrs -> (
+      let cycle = eq_own_type hd_ptr in
+      if cycle then true else has_cycles tl_ptrs
+      )
+  )
+  in
+  not (has_cycles name_ptrs)
+)
 
 and make_type err tenv = function
   | A.NameTy (ty, pos) -> (
