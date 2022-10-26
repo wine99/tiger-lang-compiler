@@ -1,0 +1,7 @@
+let
+  type a = b
+  type b = a
+  var x : a := 0
+in
+  if x then 0 else 1
+end

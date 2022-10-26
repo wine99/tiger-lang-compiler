@@ -145,6 +145,15 @@
         ]
     },
     {
+        "file": "neg/sem/loop_tpe.tig",
+        "feature-sets": [
+            "sem0",
+            "sem1",
+            "sem2",
+            "sem3"
+        ]
+    },
+    {
         "file": "neg/sem/nil.tig",
         "feature-sets": [
             "lex0",
