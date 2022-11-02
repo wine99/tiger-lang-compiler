@@ -72,7 +72,58 @@ let rec hoist_exp (ctxt : context) (Exp {exp_base; pos; ty} : A.exp) : H.exp
           {test= hoistE_ test; thn= hoistE_ thn; els= Option.map hoistE_ els}
     | WhileExp {test; body} ->
         WhileExp {test= hoistE_ test; body= hoistE_ body}
-    | ForExp _ -> raise NotImplemented
+    | ForExp {var; escape; lo; hi; body} ->
+        let vardecl =
+          A.VarDec {name= var; escape; typ= Types.INT; init= lo; pos}
+        in
+        let cond_left =
+          A.Exp
+            { exp_base=
+                A.VarExp (A.Var {var_base= SimpleVar var; pos; ty= Types.INT})
+            ; pos
+            ; ty= Types.INT }
+        in
+        let cond =
+          A.Exp
+            { exp_base= A.OpExp {left= cond_left; oper= LtOp; right= hi}
+            ; pos
+            ; ty= Types.INT }
+        in
+        let left_op =
+          A.Exp
+            { exp_base=
+                A.VarExp
+                  (A.Var {var_base= A.SimpleVar var; pos; ty= Types.INT})
+            ; pos
+            ; ty= Types.INT }
+        in
+        let right_op = A.Exp {exp_base= A.IntExp 1; pos; ty= Types.INT} in
+        let update_var_exp =
+          A.Exp
+            { exp_base= A.OpExp {left= left_op; oper= PlusOp; right= right_op}
+            ; pos
+            ; ty= Types.INT }
+        in
+        let assign_exp =
+          A.Exp
+            { exp_base=
+                A.AssignExp
+                  { var= A.Var {var_base= A.SimpleVar var; pos; ty= Types.INT}
+                  ; exp= update_var_exp }
+            ; pos
+            ; ty= Types.VOID }
+        in
+        let while_body =
+          A.Exp {exp_base= A.SeqExp [body; assign_exp]; pos; ty= Types.VOID}
+        in
+        let while_exp =
+          A.Exp
+            { exp_base= A.WhileExp {test= cond; body= while_body}
+            ; pos
+            ; ty= Types.VOID }
+        in
+        let (H.Exp {exp_base; _}) = hoist_exp ctxt while_exp in
+        exp_base
     | BreakExp -> BreakExp
     | LetExp {decls; body} ->
         let enter (ctxt, ds) d =
