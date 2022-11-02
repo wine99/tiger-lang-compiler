@@ -1,0 +1,3 @@
+(library
+ (name tigerhoist)
+ (libraries stdio tigercommon fmt))

@@ -2,7 +2,7 @@
 
 This folder includes a VSCode .devcontainer configuration. The installation
 steps are dependent on whether you are using the Docker VSCode integration
-or not. 
+or not.
 
 
 ## Installation steps for use with the Docker/VSCode integration (recommended)
@@ -30,9 +30,9 @@ or not.
 ## Accessing generated html files from outside the Docker container
 
 At various points in the development, the compiler project generates .html files
-that one may want to check out. Because the `_build` directory is not mapped to the 
+that one may want to check out. Because the `_build` directory is not mapped to the
 host operating system, we use a simple python http server for serving the content
-of that file. VSCode provides the port forwarding. See `http-server` target in 
+of that file. VSCode provides the port forwarding. See `http-server` target in
 the Makefile.
 
 ## Using custom utop

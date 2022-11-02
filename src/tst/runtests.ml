@@ -13,7 +13,9 @@
 
 let defaultPhasesToCheck =
   let open TestPhases in
-  [SEM]
+  [ HOIST
+    (* uncomment the next line to enable LL testing *)
+    (* LL Batch; LL Interactive *) ]
 
 (* obs: for student code the above list must correspond to only one phase *)
 

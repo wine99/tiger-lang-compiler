@@ -18,7 +18,7 @@ compile-test-tool:
 # it with --help option; Some usage is also described in 
 # the course document
 test:
-	_build/install/default/bin/runtests --fs-list sem0,sem1,sem2,sem3
+	_build/install/default/bin/runtests  --fs-list llvm0,llvm1,llvm2,llvm3,llvm4
 
 
 # Wait continuously for file changes and recompile

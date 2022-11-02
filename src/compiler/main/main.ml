@@ -8,6 +8,8 @@ open Tigercommon
 open Tigerlexer
 open Tigerparser
 open Tigersemant
+open Tigerhoist
+open Tigerll
 open Phases
 open ExitCodes
 module A = Absyn
@@ -72,6 +74,14 @@ let semant exp =
   if Errenv.any_errors err then raise (ExitMain SEM) ;
   texp
 
+let hoist texp =
+  let aexp = Alphaconversion.alpha_convert texp in
+  Hoisting.hoist aexp
+
+let js file out hexp = HoistedToJs.to_js file out hexp
+
+let llvm p = Llcodegen.codegen_prog p
+
 (* --- command-line checking; dispatching to the right phase --- *)
 
 (* observe that we make sure that exit flags are raised upon
@@ -83,14 +93,23 @@ let tiger {file; phase; unfold; out; _} =
       | LEX -> lexonly file out
       | PAR -> file |> parse |> Prabsyn.print_exp out
       | SEM -> file |> parse |> semant |> Prtabsyn.print_exp unfold out
+      | HOIST ->
+          file |> parse |> semant |> hoist |> Pp_habsyn.print_program out
+      | JS -> file |> parse |> semant |> hoist |> js file out
+      | LLVM ->
+          file |> parse |> semant |> hoist |> llvm |> Ll.string_of_prog
+          |> fun ll_s1 ->
+          let open Llextra in
+          let ll_s2 =
+            Format.sprintf "%s\n\n%s\n%s" ll_target_triple runtime_fns ll_s1
+          in
+          Format.fprintf out "%s" ll_s2
       | _ -> failwith "Phase not implemented"
     with ExitMain p -> exitCode := error_code p ) ;
   Format.pp_print_flush out () ;
   flush_all () ;
   exit !exitCode
 (* obs: exits the program *)
-
-(* --- program entry point: prep work wrt command line args --- *)
 
 open Cmdliner
 
@@ -131,7 +150,7 @@ let phase_arg =
     "Compile to $(docv). The value $(docv) must be " ^ Arg.doc_alts_enum ls
     ^ ". Ignored if $(b,language) is $(b,llvm)."
   in
-  Arg.(value & opt (enum ls) SEM & info ["p"; "phase"] ~docv:"PHASE" ~doc)
+  Arg.(value & opt (enum ls) LLVM & info ["p"; "phase"] ~docv:"PHASE" ~doc)
 
 let unfold_arg =
   let doc = "Unfold name-types $(docv) levels when pretty-printing." in
@@ -169,7 +188,7 @@ let main_t =
     $ language_arg)
 
 let info =
-  let doc = "Tiger AU student compiler." in
+  let doc = "Tiger AU reference compiler." in
   let success = Cmd.Exit.info 0 ~doc:"on success" in
   let lex_exit = Cmd.Exit.info 10 ~doc:"on lexing error" in
   let par_exit = Cmd.Exit.info 20 ~doc:"on parsing error" in
