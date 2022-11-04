@@ -1,6 +1,0 @@
-let
-  var x := 1
-  var y := 1
-in
-  while while y = 1 do x + y do 2 * x
-end
