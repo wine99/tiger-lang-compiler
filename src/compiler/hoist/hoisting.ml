@@ -22,7 +22,7 @@ exception NotImplemented
 
 exception HoistingFatal (* for impossible cases *)
 
-let _ONLY_LL0_FEATURESET = true
+let _ONLY_LL0_FEATURESET = not true
 
 type writer =
   { mutable fdecls_rev: H.fundecldata list
@@ -60,7 +60,11 @@ let rec hoist_exp (ctxt : context) (Exp {exp_base; pos; ty} : A.exp) : H.exp
           { func
           ; lvl_diff=
               ( if _ONLY_LL0_FEATURESET then 0 (* !!! *)
-              else raise NotImplemented )
+              else
+                let level = S.look (ctxt.venv, func) in
+                match level with
+                | None -> raise HoistingFatal
+                | Some x -> ctxt.level - x )
           ; args= List.map hoistE_ args }
     | OpExp {left; oper; right} ->
         OpExp {left= hoistE_ left; oper; right= hoistE_ right}
