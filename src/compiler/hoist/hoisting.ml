@@ -167,13 +167,18 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
      no modification here are expected *)
   | VarDec {name; escape; typ; init; pos} ->
       (* This whole case should be in the skeleton *)
-      let d = H.VarDec {name; escape; typ; init= hoist_exp ctxt init; pos} in
+      let var_decl = H.VarDec {name; escape; typ; init= hoist_exp ctxt init; pos} in
       (* we use the current level that we have set in the context *)
       let venv = S.enter (ctxt.venv, name, ctxt.level) in
       (* need to account for the local variables; obs the mutable update *)
       ctxt.locals_ref := (name, typ) :: !(ctxt.locals_ref) ;
-      ({ctxt with venv}, Some d)
-  | _ -> raise NotImplemented
+      ({ctxt with venv}, Some var_decl)
+  | FunctionDec ls -> (
+    match ls with
+    | [] -> raise NotImplemented
+    | x :: xs -> raise NotImplemented
+  )
+  | TypeDec ls -> raise NotImplemented
 
 (* Hoist function / completed *)
 let hoist (Exp {pos; ty; _} as aexp : A.exp) : H.program =
