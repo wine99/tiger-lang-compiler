@@ -192,7 +192,7 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
         let venv =
           List.fold_left
             (fun acc (A.Arg {name= n; _}) -> S.enter (acc, n, level))
-            (S.enter (ctxt.venv, name, ctxt.level))
+            (S.enter (ctxt.venv, name, ctxt.level)) (* fix mutual recursion, just add all the names of the functions in ls *)
             args
         in
         let ctxt' = {ctxt with level; name; venv} in
