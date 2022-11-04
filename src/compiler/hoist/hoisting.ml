@@ -184,7 +184,13 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
       (* need to account for the local variables; obs the mutable update *)
       ctxt.locals_ref := (name, typ) :: !(ctxt.locals_ref) ;
       ({ctxt with venv}, Some var_decl)
-  | FunctionDec ls ->
+  | FunctionDec funcs ->
+      let mutual_rec_venv =
+        List.map (fun (A.Fdecl {name; _}) -> name) funcs
+        |> List.fold_left
+             (fun acc n -> S.enter (acc, n, ctxt.level))
+             ctxt.venv
+      in
       let f ctxt_acc (A.Fdecl {name; args; result; body; pos}) =
         let level = ctxt.level + 1 in
         let old_locals = !(ctxt.locals_ref) in
@@ -192,8 +198,7 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
         let venv =
           List.fold_left
             (fun acc (A.Arg {name= n; _}) -> S.enter (acc, n, level))
-            (S.enter (ctxt.venv, name, ctxt.level)) (* fix mutual recursion, just add all the names of the functions in ls *)
-            args
+            mutual_rec_venv args
         in
         let ctxt' = {ctxt with level; name; venv} in
         let parent_opt = Some ctxt.name in
@@ -212,7 +217,7 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
         emit_fdecl ctxt.writer hoisted_fdecl ;
         {ctxt_acc with venv}
       in
-      (List.fold_left f ctxt ls, None)
+      (List.fold_left f ctxt funcs, None)
   | TypeDec ls ->
       let f ctxt_acc (A.Tdecl {name; ty; pos}) =
         let h_tdecl = H.Tdecl {name; ty; pos} in
