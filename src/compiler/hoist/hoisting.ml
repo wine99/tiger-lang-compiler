@@ -176,7 +176,7 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
       ctxt.locals_ref := (name, typ) :: !(ctxt.locals_ref) ;
       ({ctxt with venv}, Some var_decl)
   | FunctionDec ls ->
-      let f (A.Fdecl {name; args; result; body; pos}) =
+      let f ctxt_acc (A.Fdecl {name; args; result; body; pos}) =
         let level = ctxt.level + 1 in
         let old_locals = !(ctxt.locals_ref) in
         ctxt.locals_ref := [] ;
@@ -195,11 +195,18 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
         let hoisted_fdecl =
           H.Fdecl {name; args; result; body= h_body; pos; parent_opt; locals}
         in
-        emit_fdecl ctxt.writer hoisted_fdecl
+        emit_fdecl ctxt.writer hoisted_fdecl ;
+        {ctxt_acc with venv}
       in
-      List.fold_left (fun _ x -> f x) () ls ;
-      (ctxt, None)
-  | TypeDec ls -> raise NotImplemented
+      (List.fold_left f ctxt ls, None)
+  | TypeDec ls ->
+      let f ctxt_acc (A.Tdecl {name; ty; pos}) =
+        let h_tdecl = H.Tdecl {name; ty; pos} in
+        let venv = S.enter (ctxt.venv, name, ctxt.level) in
+        emit_tdecl ctxt.writer h_tdecl ;
+        {ctxt_acc with venv}
+      in
+      (List.fold_left f ctxt ls, None)
 
 (* Hoist function / completed *)
 let hoist (Exp {pos; ty; _} as aexp : A.exp) : H.program =
