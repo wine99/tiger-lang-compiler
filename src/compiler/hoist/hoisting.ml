@@ -154,7 +154,12 @@ and hoist_var ctxt (Var {var_base; pos; ty} : A.var) : H.var =
     match var_base with
     | SimpleVar x ->
         let n =
-          if _ONLY_LL0_FEATURESET then 0 (* !!! *) else raise NotImplemented
+          if _ONLY_LL0_FEATURESET then 0 (* !!! *)
+          else
+            let level = S.look (ctxt.venv, x) in
+            match level with
+            | None -> raise HoistingFatal
+            | Some x -> ctxt.level - x
         in
         AccessVar (n, x)
     | FieldVar (v, x) -> FieldVar (hoist_var ctxt v, x)
@@ -184,7 +189,12 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
         let level = ctxt.level + 1 in
         let old_locals = !(ctxt.locals_ref) in
         ctxt.locals_ref := [] ;
-        let venv = S.enter (ctxt.venv, name, ctxt.level) in
+        let venv =
+          List.fold_left
+            (fun acc (A.Arg {name= n; _}) -> S.enter (acc, n, level))
+            (S.enter (ctxt.venv, name, ctxt.level))
+            args
+        in
         let ctxt' = {ctxt with level; name; venv} in
         let parent_opt = Some ctxt.name in
         let h_body = hoist_exp ctxt' body in
