@@ -167,17 +167,38 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
      no modification here are expected *)
   | VarDec {name; escape; typ; init; pos} ->
       (* This whole case should be in the skeleton *)
-      let var_decl = H.VarDec {name; escape; typ; init= hoist_exp ctxt init; pos} in
+      let var_decl =
+        H.VarDec {name; escape; typ; init= hoist_exp ctxt init; pos}
+      in
       (* we use the current level that we have set in the context *)
       let venv = S.enter (ctxt.venv, name, ctxt.level) in
       (* need to account for the local variables; obs the mutable update *)
       ctxt.locals_ref := (name, typ) :: !(ctxt.locals_ref) ;
       ({ctxt with venv}, Some var_decl)
-  | FunctionDec ls -> (
-    match ls with
-    | [] -> raise NotImplemented
-    | x :: xs -> raise NotImplemented
-  )
+  | FunctionDec ls ->
+      let f (A.Fdecl {name; args; result; body; pos}) =
+        let level = ctxt.level + 1 in
+        let old_locals = !(ctxt.locals_ref) in
+        ctxt.locals_ref := [] ;
+        let venv = S.enter (ctxt.venv, name, ctxt.level) in
+        let ctxt' = {ctxt with level; name; venv} in
+        let parent_opt = Some ctxt.name in
+        let h_body = hoist_exp ctxt' body in
+        let locals = !(ctxt.locals_ref) in
+        ctxt.locals_ref := old_locals ;
+        let args =
+          List.map
+            (fun (A.Arg {name= n; escape; ty; pos= p}) ->
+              H.Arg {name= n; escape; ty; pos= p} )
+            args
+        in
+        let hoisted_fdecl =
+          H.Fdecl {name; args; result; body= h_body; pos; parent_opt; locals}
+        in
+        emit_fdecl ctxt.writer hoisted_fdecl
+      in
+      List.fold_left (fun _ x -> f x) () ls ;
+      (ctxt, None)
   | TypeDec ls -> raise NotImplemented
 
 (* Hoist function / completed *)
