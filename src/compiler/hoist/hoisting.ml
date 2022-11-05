@@ -89,7 +89,7 @@ let rec hoist_exp (ctxt : context) (Exp {exp_base; pos; ty} : A.exp) : H.exp
         in
         let cond =
           A.Exp
-            { exp_base= A.OpExp {left= cond_left; oper= LtOp; right= hi}
+            { exp_base= A.OpExp {left= cond_left; oper= LeOp; right= hi}
             ; pos
             ; ty= Types.INT }
         in
