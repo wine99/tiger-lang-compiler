@@ -115,12 +115,18 @@ let build_store t o1 o2 = B.add_insn (None, Ll.Store (t, o1, o2))
 
 let gep_0 ty op i = Ll.Gep (ty, op, [Const 0; Const i])
 
+let ar_oper =
+  [Oper.PlusOp; Oper.MinusOp; Oper.TimesOp; Oper.DivideOp; Oper.ExponentOp]
+
+let cmp_oper =
+  [Oper.EqOp; Oper.NeqOp; Oper.LtOp; Oper.LeOp; Oper.GtOp; Oper.GeOp]
+
 let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
     B.buildlet * Ll.operand (* Alternatively: Ll.operand m *) =
   let cgE_ = cgExp ctxt in
   match exp_base with
   | IntExp i -> (id, Const i)
-  | H.OpExp {left; right; oper; _} ->
+  (*| H.OpExp {left; right; oper; _} ->
       let build_right, op_right = cgE_ right in
       let build_left, op_left = cgE_ left in
       let bop =
@@ -139,19 +145,38 @@ let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
       (builder', Ll.Id newid)
       (* the above can be rewritten using the monadic interface and aux functions
          as follows *)
-      (*
-    | H.OpExp {left; right; oper; _} ->
-      let* op_left  = cgE_ left  in
-      let* op_right = cgE_ right in 
-      let bop = match oper with 
-                    PlusOp -> Ll.Add 
-                  | MinusOp -> Ll.Sub
-                  | TimesOp -> Ll.Mul 
-                  |_ -> raise NotImplemented
-                in
-      let i = Ll.Binop (bop, Ll.I64, op_left, op_right ) in 
+  *)
+  | H.OpExp {left; right; oper; _}
+    when List.exists (fun x -> x = oper) ar_oper ->
+      let* op_left = cgE_ left in
+      let* op_right = cgE_ right in
+      let bop =
+        match oper with
+        | PlusOp -> Ll.Add
+        | MinusOp -> Ll.Sub
+        | TimesOp -> Ll.Mul
+        | DivideOp -> Ll.SDiv
+        | ExponentOp -> raise NotImplemented
+        | _ -> raise NotImplemented
+      in
+      let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
       aiwf "temp" i
-      *)
+  | H.OpExp {left; right; oper; _}
+    when List.exists (fun x -> x = oper) cmp_oper ->
+      let* op_left = cgE_ left in
+      let* op_right = cgE_ right in
+      let cnd =
+        match oper with
+        | EqOp -> Ll.Eq
+        | NeqOp -> Ll.Ne
+        | LtOp -> Ll.Slt
+        | LeOp -> Ll.Sle
+        | GtOp -> Ll.Sgt
+        | GeOp -> Ll.Sge
+        | _ -> raise NotImplemented
+      in
+      let i = Ll.Icmp (cnd, Ll.I1, op_left, op_right) in
+      aiwf "temp" i
   | _ -> raise NotImplemented
 
 and cgVar (_ : context) (H.Var _) = raise NotImplemented
