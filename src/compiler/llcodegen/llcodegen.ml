@@ -36,7 +36,19 @@ exception NotImplemented
 
 exception CodeGenerationBug
 
-let ty_to_llty = function Ty.INT -> Ll.I64 | _ -> raise NotImplemented
+let rec ty_to_llty = function
+  | Ty.INT -> Ll.I64
+  | Ty.NIL -> Ll.Ptr I8
+  | Ty.STRING -> Ll.Ptr I8
+  | Ty.RECORD (ts, _) as base_ty ->
+      Ll.Struct
+        (List.map
+           (fun (_, t) -> if t = base_ty then Ll.Ptr I8 else ty_to_llty t)
+           ts ) (* todo: make actual_type function *)
+  | Ty.ARRAY _ -> Ll.Ptr I8
+  | Ty.NAME (sym, _) -> Ll.Namedt sym
+  | Ty.VOID -> raise NotImplemented
+  | Ty.ERROR -> raise CodeGenerationBug
 
 type context =
   { break_lbl: Ll.lbl option
@@ -46,8 +58,18 @@ type context =
   ; gdecls: (Ll.gid * Ll.gdecl) list ref }
 
 (* Obs: this is a rather tricky piece of code; 2019-10-12 *)
-let cg_tydecl (_ : unique_env ref) (H.Tdecl {name; ty; _}) =
-  match ty with Ty.INT -> Some (name, Ll.I64) | _ -> raise NotImplemented
+let cg_tydecl (uenv : unique_env ref) (H.Tdecl {name; ty; _}) =
+  match ty with
+  | Ty.INT -> Some (name, Ll.I64) (* type a = int *)
+  | Ty.STRING -> Some (name, Ll.Ptr I8) (* type a = string *)
+  | Ty.RECORD _ -> raise NotImplemented (* type a = { ... }*)
+  | Ty.NAME (sym, _) -> Some (name, Ll.Namedt sym) (* type a = b *)
+  | Ty.VOID -> None
+  | Ty.NIL -> None
+  | Ty.ERROR -> None
+  | Ty.ARRAY _ -> raise NotImplemented
+(* (
+   match UniqueMap.find_opt name !uenv with _ -> raise NotImplemented )*)
 
 let fresh =
   let open Freshsymbols in
@@ -179,14 +201,14 @@ let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
       aiwf "temp" i
   | _ -> raise NotImplemented
 
-and cgVar (ctxt : context) (H.Var {var_base ; pos ; ty}) =
+and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   match var_base with
   | AccessVar (i, sym) -> raise NotImplemented
   | FieldVar (var, sym) -> raise NotImplemented
   | SubscriptVar (v, exp) ->
-    let* cg_var = cgVar ctxt v in
-    let* cg_exp = cgExp ctxt exp in
-    raise NotImplemented
+      let* cg_var = cgVar ctxt v in
+      let* cg_exp = cgExp ctxt exp in
+      raise NotImplemented
   | _ -> raise NotImplemented
 
 (* --- From this point on the code requires no changes --- *)

@@ -126,13 +126,13 @@ let rec hoist_exp (ctxt : context) (Exp {exp_base; pos; ty} : A.exp) : H.exp
             ; pos
             ; ty= Types.VOID }
         in
-        let (H.Exp {exp_base; _}) = hoist_exp ctxt 
-          (A.Exp
-            { exp_base= A.LetExp
-                { decls= [ vardecl ]
-                ; body= while_exp }
-            ; pos= pos
-            ; ty= Types.VOID }) in
+        let (H.Exp {exp_base; _}) =
+          hoist_exp ctxt
+            (A.Exp
+               { exp_base= A.LetExp {decls= [vardecl]; body= while_exp}
+               ; pos
+               ; ty= Types.VOID } )
+        in
         exp_base
     | BreakExp -> BreakExp
     | LetExp {decls; body} ->
