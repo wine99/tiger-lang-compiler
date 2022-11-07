@@ -258,7 +258,7 @@ int64_t exponent(int64_t base, int64_t expn)
   res = 1;
   i = expn;
   for (i ; i > 0 ; i--) {
-    res = res * i;
+    res = res * base;
   }
   return res; /* keeping gcc happy */
 }
