@@ -179,7 +179,15 @@ let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
       aiwf "temp" i
   | _ -> raise NotImplemented
 
-and cgVar (_ : context) (H.Var _) = raise NotImplemented
+and cgVar (ctxt : context) (H.Var {var_base ; pos ; ty}) =
+  match var_base with
+  | AccessVar (i, sym) -> raise NotImplemented
+  | FieldVar (var, sym) -> raise NotImplemented
+  | SubscriptVar (v, exp) ->
+    let* cg_var = cgVar ctxt v in
+    let* cg_exp = cgExp ctxt exp in
+    raise NotImplemented
+  | _ -> raise NotImplemented
 
 (* --- From this point on the code requires no changes --- *)
 
