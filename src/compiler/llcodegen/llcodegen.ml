@@ -40,15 +40,18 @@ let rec ty_to_llty = function
   | Ty.INT -> Ll.I64
   | Ty.NIL -> Ll.Ptr I8
   | Ty.STRING -> Ll.Ptr I8
-  | Ty.RECORD (ts, _) as base_ty ->
-      Ll.Struct
-        (List.map
-           (fun (_, t) -> if t = base_ty then Ll.Ptr I8 else ty_to_llty t)
-           ts ) (* todo: make actual_type function *)
+  | Ty.RECORD (ts, _) -> Ll.Struct (List.map mk_actual_llvm_type ts)
   | Ty.ARRAY _ -> Ll.Ptr I8
   | Ty.NAME (sym, _) -> Ll.Namedt sym
-  | Ty.VOID -> raise NotImplemented
+  | Ty.VOID -> Ll.Void
   | Ty.ERROR -> raise CodeGenerationBug
+
+(** Returns the llvm type corresponding to the given type except for arrays
+    and records which will be mappen to i8 pointers *)
+and mk_actual_llvm_type = function
+  | _, Ty.RECORD _ -> Ll.Ptr I8
+  | _, Ty.ARRAY _ -> Ll.Ptr I8
+  | _, t -> ty_to_llty t
 
 type context =
   { break_lbl: Ll.lbl option
