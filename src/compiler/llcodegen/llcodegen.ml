@@ -62,17 +62,26 @@ type context =
 
 (* Obs: this is a rather tricky piece of code; 2019-10-12 *)
 let cg_tydecl (uenv : unique_env ref) (H.Tdecl {name; ty; _}) =
+  let llvm_type = ty_to_llty ty in
   match ty with
-  | Ty.INT -> Some (name, Ll.I64) (* type a = int *)
-  | Ty.STRING -> Some (name, Ll.Ptr I8) (* type a = string *)
-  | Ty.RECORD _ -> raise NotImplemented (* type a = { ... }*)
-  | Ty.NAME (sym, _) -> Some (name, Ll.Namedt sym) (* type a = b *)
-  | Ty.VOID -> None
+  | Ty.INT -> Some (name, llvm_type) (* type a = int *)
+  | Ty.STRING -> Some (name, llvm_type) (* type a = string *)
+  | Ty.NAME (_, _) -> Some (name, llvm_type) (* type a = b *)
+  | Ty.VOID -> Some (name, llvm_type)
+  | Ty.RECORD (_, u) -> (
+    match UniqueMap.find_opt u !uenv with
+    | None ->
+        uenv := UniqueMap.add u name !uenv ;
+        Some (name, llvm_type)
+    | Some _ -> None )
+  | Ty.ARRAY (_, u) -> (
+    match UniqueMap.find_opt u !uenv with
+    | None ->
+        uenv := UniqueMap.add u name !uenv ;
+        Some (name, llvm_type)
+    | Some _ -> None )
   | Ty.NIL -> None
   | Ty.ERROR -> None
-  | Ty.ARRAY _ -> raise NotImplemented
-(* (
-   match UniqueMap.find_opt name !uenv with _ -> raise NotImplemented )*)
 
 let fresh =
   let open Freshsymbols in
