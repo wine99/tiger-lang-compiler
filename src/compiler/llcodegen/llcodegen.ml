@@ -214,8 +214,14 @@ let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
   | _ -> raise NotImplemented
 
 and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
+  let llvm_type = ty_to_llty ty in
   match var_base with
-  | AccessVar (i, sym) -> raise NotImplemented
+  | AccessVar (i, sym) -> (
+    match i with
+    | 0 ->
+        let inst = Ll.Load (llvm_type, Ll.Id sym) in
+        aiwf "tmp" inst
+    | n -> raise NotImplemented (* Generate instrs to traverse envs *) )
   | FieldVar (var, sym) -> raise NotImplemented
   | SubscriptVar (v, exp) ->
       let* cg_var = cgVar ctxt v in
