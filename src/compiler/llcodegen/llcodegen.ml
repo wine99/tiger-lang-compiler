@@ -218,13 +218,16 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   match var_base with
   | AccessVar (i, sym) -> (
     match i with
-    | 0 -> (* Generalize later to n levels with gep *)
-      let locals_tpe = raise NotImplemented in (* Type of struct with local vars in llvm *)
-      let sumry_locls = Ll.Id ctxt.summary.locals_uid in
-      let offset = ctxt.summary.offset_of_symbol sym in
+    | 0 ->
+        (* Generalize later to n levels with gep *)
+        let locals_tpe = Ll.Namedt ctxt.summary.locals_tid in
+        (* Type of struct with local vars in llvm *)
+        let sumry_locls = Ll.Id ctxt.summary.locals_uid in
+        let offset = ctxt.summary.offset_of_symbol sym in
         let load_locals_inst = gep_0 locals_tpe sumry_locls offset in
-        let inst = raise NotImplemented (* Ll.Load (llvm_type, ) *) in
-        aiwf "tmp" inst
+        let* var_register = aiwf "var" load_locals_inst in
+        let inst = Ll.Load (llvm_type, var_register) in
+        aiwf "var" inst
     | n -> raise NotImplemented )
   | FieldVar (var, sym) -> raise NotImplemented
   | SubscriptVar (v, exp) ->
