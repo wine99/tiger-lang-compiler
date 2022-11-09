@@ -25,10 +25,10 @@ end)
 type unique_env = Ll.tid UniqueMap.t
 
 type fdecl_summary =
-  { parent_opt: Ll.gid option
-  ; locals_uid: Ll.uid
-  ; locals_tid: Ll.tid
-  ; offset_of_symbol: S.symbol -> int }
+  { parent_opt: Ll.gid option (* optional symbol 'parent' in locals.parent *)
+  ; locals_uid: Ll.uid (* symbol 'locals' in locals.field *)
+  ; locals_tid: Ll.tid (* type of the struct of 'locals'. Each 'locals' struct is a distinct type *)
+  ; offset_of_symbol: S.symbol -> int  (* the offset of the symbol in 'locals', used for gep instruction *)}
 
 type summary_env = fdecl_summary SymbolMap.t
 
