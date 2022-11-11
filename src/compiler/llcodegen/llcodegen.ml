@@ -27,8 +27,11 @@ type unique_env = Ll.tid UniqueMap.t
 type fdecl_summary =
   { parent_opt: Ll.gid option (* optional symbol 'parent' in locals.parent *)
   ; locals_uid: Ll.uid (* symbol 'locals' in locals.field *)
-  ; locals_tid: Ll.tid (* type of the struct of 'locals'. Each 'locals' struct is a distinct type *)
-  ; offset_of_symbol: S.symbol -> int  (* the offset of the symbol in 'locals', used for gep instruction *)}
+  ; locals_tid: Ll.tid
+        (* type of the struct of 'locals'. Each 'locals' struct is a distinct type *)
+  ; offset_of_symbol: S.symbol -> int
+        (* the offset of the symbol in 'locals', used for gep instruction *)
+  }
 
 type summary_env = fdecl_summary SymbolMap.t
 
@@ -117,6 +120,7 @@ let aiwf s i =
   let t = fresh s in
   (B.add_insn (Some t, i), Ll.Id t)
 
+let biwf t i = (B.add_insn (Some t, i), Ll.Id t)
 (* --- monadic interface;) ----------------------------- *)
 
 (* Notes on the monadic interface:
@@ -216,24 +220,73 @@ let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
 and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   let llvm_type = ty_to_llty ty in
   match var_base with
-  | AccessVar (i, sym) -> (
-    match i with
-    | 0 ->
-        (* Generalize later to n levels with gep *)
-        let locals_tpe = Ll.Namedt ctxt.summary.locals_tid in
-        let sumry_locls = Ll.Id ctxt.summary.locals_uid in
-        let offset = ctxt.summary.offset_of_symbol sym in
-        let load_locals_inst = gep_0 locals_tpe sumry_locls offset in
-        let* var_register = aiwf "var" load_locals_inst in
-        let inst = Ll.Load (llvm_type, var_register) in
-        aiwf "var" inst
-    | n -> raise NotImplemented )
+  | AccessVar (i, sym) ->
+      let* var_register = cgVarLookup ctxt sym i in
+      let inst = Ll.Load (llvm_type, var_register) in
+      aiwf "var" inst
   | FieldVar (var, sym) -> raise NotImplemented
   | SubscriptVar (v, exp) ->
       let* cg_var = cgVar ctxt v in
       let* cg_exp = cgExp ctxt exp in
       raise NotImplemented
   | _ -> raise NotImplemented
+
+and cgVarLookup (ctxt : context) sym = function
+  | i ->
+      let parent_pointer_names = gen_names [] i in
+      let locals_tpe = Ll.Namedt ctxt.summary.locals_tid in
+      let sumry_locls = Ll.Id ctxt.summary.locals_uid in
+      let offset = ctxt.summary.offset_of_symbol sym in
+      let load_locals_inst = gep_0 locals_tpe sumry_locls offset in
+      aiwf "var" load_locals_inst
+
+and gen_names = function
+  | xs -> (
+      function
+      | 0 -> List.rev (fresh "locals" :: xs)
+      | i -> gen_names (fresh "parent" :: xs) (i - 1) )
+
+and cgParentLookup (ctxt : context) fdecl_summary i sym =
+  let rec loop oper sumry n =
+    let locals_tpe = Ll.Namedt sumry.locals_tid in
+    match n with
+    | 0 ->
+        let offset = sumry.offset_of_symbol sym in
+        let load_locals_inst = gep_0 locals_tpe oper offset in
+        aiwf (S.name sym) load_locals_inst
+    | _ -> (
+        let psym =
+          match sumry.parent_opt with
+          | None -> raise CodeGenerationBug
+          | Some s -> s
+        in
+        let offset = sumry.offset_of_symbol psym in
+        let gep_parent = gep_0 locals_tpe oper offset in
+        let* inst = aiwf (S.name psym) gep_parent in
+        let psumry = SymbolMap.find_opt psym ctxt.senv in
+        match psumry with
+        | None -> raise CodeGenerationBug
+        | Some pfs -> loop inst pfs (n - 1) )
+  in
+  let op = Ll.Id fdecl_summary.locals_uid in
+  loop op fdecl_summary i
+
+let rec cgParentL (ctxt : context) (summary : fdecl_summary) parent_ptr =
+  function
+  | 0 -> return parent_ptr
+  (* | 1 ->
+      aiwf "parent_ptr" (gep_0 (Namedt summary.locals_tid) parent_ptr 0) *)
+  | n ->
+      let parent_sym =
+        match summary.parent_opt with
+        | Some sym -> sym
+        | None -> raise CodeGenerationBug
+      in
+      let parent_summary = SymbolMap.find parent_sym ctxt.senv in
+      let* parent_parent_ptr =
+        aiwf "parent_ptr" (gep_0 (Namedt summary.locals_tid) parent_ptr 0)
+      in
+      cgParentL ctxt parent_summary parent_parent_ptr (n - 1)
 
 (* --- From this point on the code requires no changes --- *)
 
