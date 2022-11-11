@@ -39,6 +39,13 @@ exception NotImplemented
 
 exception CodeGenerationBug
 
+let ty_of_exp = function H.Exp {ty; _} -> ty
+
+let rec sym_of_var = function
+  | H.Var {var_base= AccessVar (_, s); _} -> s
+  | H.Var {var_base= FieldVar (v, _); _} -> sym_of_var v
+  | H.Var {var_base= SubscriptVar (v, _); _} -> sym_of_var v
+
 let rec ty_to_llty = function
   | Ty.INT -> Ll.I64
   | Ty.NIL -> Ll.Ptr I8
@@ -215,6 +222,12 @@ let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
       in
       let i = Ll.Icmp (cnd, Ll.I1, op_left, op_right) in
       aiwf "temp" i
+  | H.AssignExp {var; exp} ->
+      let* e = cgE_ exp in
+      let* dest = cgVar ctxt var in
+      let t = ty_to_llty @@ ty_of_exp exp in
+      let inst = Ll.Store (t, e, dest) in
+      aiwf (S.name @@ sym_of_var var) inst
   | _ -> raise NotImplemented
 
 and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
@@ -222,9 +235,7 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   match var_base with
   | AccessVar (i, sym) ->
       let op = Ll.Id ctxt.summary.locals_uid in
-      let* register = cgParentLookup ctxt ctxt.summary op sym i in
-      let inst = Ll.Load (llvm_type, register) in
-      aiwf (S.name sym) inst
+      cgParentLookup ctxt ctxt.summary op sym i
   | FieldVar (var, sym) -> raise NotImplemented
   | SubscriptVar (v, exp) ->
       let* cg_var = cgVar ctxt v in
@@ -233,34 +244,34 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   | _ -> raise NotImplemented
 
 (* TODO: Remove if cgParentLookup is succesful / correct
-and cgParentL (ctxt : context) fdecl_summary i sym =
-  let rec loop oper sumry n =
-    let locals_tpe = Ll.Namedt sumry.locals_tid in
-    match n with
-    | 0 ->
-        let offset = sumry.offset_of_symbol sym in
-        let load_locals_inst = gep_0 locals_tpe oper offset in
-        aiwf (S.name sym ^ "_ptr") load_locals_inst
-    | _ -> (
-        let psym =
-          match sumry.parent_opt with
-          | None -> raise CodeGenerationBug
-          | Some s -> s
-        in
-        let offset = sumry.offset_of_symbol psym in
-        let gep_parent = gep_0 locals_tpe oper offset in
-        let* inst = aiwf (S.name psym ^ "_ptr") gep_parent in
-        let psumry = SymbolMap.find_opt psym ctxt.senv in
-        match psumry with
-        | None -> raise CodeGenerationBug
-        | Some pfs -> loop inst pfs (n - 1) )
-  in
-  let op = Ll.Id fdecl_summary.locals_uid in
-  loop op fdecl_summary i
+   and cgParentL (ctxt : context) fdecl_summary i sym =
+     let rec loop oper sumry n =
+       let locals_tpe = Ll.Namedt sumry.locals_tid in
+       match n with
+       | 0 ->
+           let offset = sumry.offset_of_symbol sym in
+           let load_locals_inst = gep_0 locals_tpe oper offset in
+           aiwf (S.name sym ^ "_ptr") load_locals_inst
+       | _ -> (
+           let psym =
+             match sumry.parent_opt with
+             | None -> raise CodeGenerationBug
+             | Some s -> s
+           in
+           let offset = sumry.offset_of_symbol psym in
+           let gep_parent = gep_0 locals_tpe oper offset in
+           let* inst = aiwf (S.name psym ^ "_ptr") gep_parent in
+           let psumry = SymbolMap.find_opt psym ctxt.senv in
+           match psumry with
+           | None -> raise CodeGenerationBug
+           | Some pfs -> loop inst pfs (n - 1) )
+     in
+     let op = Ll.Id fdecl_summary.locals_uid in
+     loop op fdecl_summary i
 *)
 
-and cgParentLookup (ctxt : context) (summary : fdecl_summary) parent_ptr sym =
-  function
+and cgParentLookup (ctxt : context) (summary : fdecl_summary) parent_ptr sym
+    = function
   | 0 ->
       aiwf
         (S.name sym ^ "_ptr")
