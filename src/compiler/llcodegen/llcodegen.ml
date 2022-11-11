@@ -222,7 +222,7 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   match var_base with
   | AccessVar (i, sym) ->
       let op = Ll.Id ctxt.summary.locals_uid in
-      let* register = cgParentL ctxt ctxt.summary op sym i in
+      let* register = cgParentLookup ctxt ctxt.summary op sym i in
       let inst = Ll.Load (llvm_type, register) in
       aiwf (S.name sym) inst
   | FieldVar (var, sym) -> raise NotImplemented
@@ -232,7 +232,8 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
       raise NotImplemented
   | _ -> raise NotImplemented
 
-and cgParentLookup (ctxt : context) fdecl_summary i sym =
+(* TODO: Remove if cgParentLookup is succesful / correct
+and cgParentL (ctxt : context) fdecl_summary i sym =
   let rec loop oper sumry n =
     let locals_tpe = Ll.Namedt sumry.locals_tid in
     match n with
@@ -256,8 +257,9 @@ and cgParentLookup (ctxt : context) fdecl_summary i sym =
   in
   let op = Ll.Id fdecl_summary.locals_uid in
   loop op fdecl_summary i
+*)
 
-and cgParentL (ctxt : context) (summary : fdecl_summary) parent_ptr sym =
+and cgParentLookup (ctxt : context) (summary : fdecl_summary) parent_ptr sym =
   function
   | 0 ->
       aiwf
@@ -276,7 +278,7 @@ and cgParentL (ctxt : context) (summary : fdecl_summary) parent_ptr sym =
           (S.name parent_sym ^ "_ptr")
           (gep_0 (Namedt summary.locals_tid) parent_ptr 0)
       in
-      cgParentL ctxt parent_summary parent_parent_ptr sym (n - 1)
+      cgParentLookup ctxt parent_summary parent_parent_ptr sym (n - 1)
 
 (* --- From this point on the code requires no changes --- *)
 
