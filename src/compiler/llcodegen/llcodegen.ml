@@ -10,6 +10,8 @@ module Ty = Types
 module S = Symbol
 module B = Cfgbuilder
 
+open Pp_habsyn
+
 module SymbolMap = Map.Make (struct
   type t = S.symbol
 
@@ -166,7 +168,7 @@ let ar_oper =
 let cmp_oper =
   [Oper.EqOp; Oper.NeqOp; Oper.LtOp; Oper.LeOp; Oper.GtOp; Oper.GeOp]
 
-let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
+let rec cgExp ctxt (Exp {exp_base; _} as exp : H.exp) :
     B.buildlet * Ll.operand (* Alternatively: Ll.operand m *) =
   let cgE_ = cgExp ctxt in
   match exp_base with
@@ -220,6 +222,7 @@ let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
         | GeOp -> Ll.Sge
         | _ -> raise NotImplemented
       in
+      (* FIXME if this is returned in main, it should be converted to I64 *)
       let i = Ll.Icmp (cnd, Ll.I1, op_left, op_right) in
       aiwf "temp" i
   | H.AssignExp {var; exp} ->
@@ -228,7 +231,30 @@ let rec cgExp ctxt (Exp {exp_base; _} : H.exp) :
       let t = ty_to_llty @@ ty_of_exp exp in
       let inst = Ll.Store (t, e, dest) in
       aiwf (S.name @@ sym_of_var var) inst
-  | _ -> raise NotImplemented
+  | H.LetExp {vardecl; body} -> (
+      match vardecl with
+      | VarDec {name; typ; init; _} ->
+          print_string (S.name name);
+          let* e = cgE_ init in
+          let* dest = cgParentLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid) name 0 in
+          let* _ = (id, Ll.Store (ty_to_llty typ, e, dest)) in
+          print_string " asfasdf ";
+          cgE_ body
+  )
+  | H.SeqExp exps -> (
+      let rec loop exps =
+        match exps with
+        | [] -> raise CodeGenerationBug
+        | [e] -> cgE_ e
+        | e :: es -> let* _ = cgE_ e in loop es
+      in
+      loop exps
+  )
+  | H.VarExp (H.Var {ty; _} as var)->
+      let* var_ptr = cgVar ctxt var in
+      (* TODO how do I return a operand monad where I dont have one *)
+      aiwf "tmp" (Ll.Load (ty_to_llty ty, var_ptr))
+  | _ -> Pp_habsyn.pp_exp exp Format.std_formatter () ; raise  NotImplemented
 
 and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   let llvm_type = ty_to_llty ty in
@@ -270,6 +296,7 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
      loop op fdecl_summary i
 *)
 
+(* TODO change the function name to cgVarLookup *)
 and cgParentLookup (ctxt : context) (summary : fdecl_summary) parent_ptr sym
     = function
   | 0 ->
