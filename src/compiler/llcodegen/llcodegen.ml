@@ -302,6 +302,18 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let ll_str = string_literal_llstr str in
       ctxt.gdecls := (str_id , (str_ty, ll_str)) :: !(ctxt.gdecls) ;
       aiwf "string" @@ Ll.Bitcast (Ll.Ptr str_ty, (Ll.Gid str_id), ptr_i8)
+  | H.CallExp {func; lvl_diff; args} ->
+      let rec loop args =
+        match args with
+        | [] -> (id, [])
+        | a :: args -> (
+            let build, op = cgE_ a in
+            match loop args with builds, ops -> (build $> builds, op :: ops)
+            )
+      in
+      let build, ops = loop args in
+      (* find the right static link using ctxt and lvl_diff *)
+      raise NotImplemented
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
