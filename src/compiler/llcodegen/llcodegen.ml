@@ -49,11 +49,11 @@ let rec sym_of_var = function
 
 let string_literal_llty str =
   let len = String.length str in
-  Ll.Struct [Ll.I64 ; Ll.Array (len, Ll.I8)]
+  Ll.Struct [Ll.I64; Ll.Array (len, Ll.I8)]
 
 let string_literal_llstr str =
   let len = String.length str in
-  Ll.GStruct [(Ll.I64 , Ll.GInt len) ; (Ll.Array (len, Ll.I8) , Ll.GString str)]
+  Ll.GStruct [(Ll.I64, Ll.GInt len); (Ll.Array (len, Ll.I8), Ll.GString str)]
 
 let rec ty_to_llty = function
   | Ty.INT -> Ll.I64
@@ -216,7 +216,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
       aiwf "arith_tmp" i
   | H.OpExp {left; right; oper; _}
-    when List.exists (fun x -> x = oper) cmp_oper ->
+    when List.exists (fun x -> x = oper) cmp_oper -> (
       (* TODO special case comparison of string *)
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
@@ -229,12 +229,11 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
         | GtOp -> Ll.Sgt
         | GeOp -> Ll.Sge
         | _ -> raise NotImplemented
-      in (
+      in
       match left with
       | H.Exp {ty; _} ->
-          let* tmp = aiwf "cmp_tmp" @@ Ll.Icmp (cnd, (ty_to_llty ty), op_left, op_right) in
-          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-      )
+          let* tmp = aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right) in
+          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) )
   | H.AssignExp {var; exp} ->
       let* e = cgE_ exp in
       let* dest = cgVar ctxt var in
@@ -266,7 +265,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let* var_ptr = cgVar ctxt var in
       let load = Ll.Load (ty_to_llty ty, var_ptr) in
       aiwf "var_tmp" load
-  | H.IfExp {test; thn; els = Some els} ->
+  | H.IfExp {test; thn; els= Some els} ->
       let res = fresh "local_ifs" in
       let res_ty = ty_to_llty ty in
       let thn_lbl = fresh "then" in
@@ -275,33 +274,33 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let* res_ptr = (B.add_alloca (res, res_ty), Ll.Id res) in
       let* test_res_i64 = cgE_ test in
       let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
-      let* _ = B.term_block (Ll.Cbr (test_res, thn_lbl, els_lbl)) , Ll.Null in
-      let* _ = B.start_block thn_lbl , Ll.Null in
+      let* _ = (B.term_block (Ll.Cbr (test_res, thn_lbl, els_lbl)), Ll.Null) in
+      let* _ = (B.start_block thn_lbl, Ll.Null) in
       let* thn_op = cgE_ thn in
-      let* _ = build_store res_ty thn_op res_ptr , Ll.Null in
-      let* _ = B.term_block (Ll.Br merge_lbl) , Ll.Null in
-      let* _ = B.start_block els_lbl , Ll.Null in
+      let* _ = (build_store res_ty thn_op res_ptr, Ll.Null) in
+      let* _ = (B.term_block (Ll.Br merge_lbl), Ll.Null) in
+      let* _ = (B.start_block els_lbl, Ll.Null) in
       let* els_op = cgE_ els in
-      let* _ = build_store res_ty els_op res_ptr , Ll.Null in
-      let* _ = B.term_block (Ll.Br merge_lbl) , Ll.Null in
-      let* _ = B.start_block merge_lbl , Ll.Null in
+      let* _ = (build_store res_ty els_op res_ptr, Ll.Null) in
+      let* _ = (B.term_block (Ll.Br merge_lbl), Ll.Null) in
+      let* _ = (B.start_block merge_lbl, Ll.Null) in
       aiwf "if_res" @@ Ll.Load (res_ty, res_ptr)
   | H.IfExp {test; thn; els= None} ->
       let thn_lbl = fresh "then" in
       let merge_lbl = fresh "merge" in
       let* test_res_i64 = cgE_ test in
       let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
-      let* _ = B.term_block (Ll.Cbr (test_res, thn_lbl, merge_lbl)) , Ll.Null in
-      let* _ = B.start_block thn_lbl , Ll.Null in
+      let* _ = (B.term_block (Ll.Cbr (test_res, thn_lbl, merge_lbl)), Ll.Null) in
+      let* _ = (B.start_block thn_lbl, Ll.Null) in
       let* _ = cgE_ thn in
-      let* _ = B.term_block (Ll.Br merge_lbl) , Ll.Null in
-      B.start_block merge_lbl , Ll.Null
+      let* _ = (B.term_block (Ll.Br merge_lbl), Ll.Null) in
+      (B.start_block merge_lbl, Ll.Null)
   | H.StringExp str ->
       let str_id = fresh "string_lit" in
       let str_ty = string_literal_llty str in
       let ll_str = string_literal_llstr str in
-      ctxt.gdecls := (str_id , (str_ty, ll_str)) :: !(ctxt.gdecls) ;
-      aiwf "string" @@ Ll.Bitcast (Ll.Ptr str_ty, (Ll.Gid str_id), ptr_i8)
+      ctxt.gdecls := (str_id, (str_ty, ll_str)) :: !(ctxt.gdecls) ;
+      aiwf "string" @@ Ll.Bitcast (Ll.Ptr str_ty, Ll.Gid str_id, ptr_i8)
   | H.CallExp {func; lvl_diff; args} ->
       let rec loop args =
         match args with
