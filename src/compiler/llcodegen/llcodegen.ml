@@ -167,7 +167,7 @@ let ar_oper =
 let cmp_oper =
   [Oper.EqOp; Oper.NeqOp; Oper.LtOp; Oper.LeOp; Oper.GtOp; Oper.GeOp]
 
-let rec cgExp ctxt (Exp {exp_base; _} as exp : H.exp) :
+let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
     B.buildlet * Ll.operand (* Alternatively: Ll.operand m *) =
   let cgE_ = cgExp ctxt in
   match exp_base with
@@ -254,6 +254,26 @@ let rec cgExp ctxt (Exp {exp_base; _} as exp : H.exp) :
       let* var_ptr = cgVar ctxt var in
       let load = Ll.Load (ty_to_llty ty, var_ptr) in
       aiwf "var_tmp" load
+  | H.IfExp {test; thn; els = Some els} ->
+      let res = fresh "local_ifs" in
+      let res_ty = ty_to_llty ty in
+      let thn_lbl = fresh "then" in
+      let els_lbl = fresh "else" in
+      let merge_lbl = fresh "merge" in
+      let* res_ptr = (B.add_alloca (res, res_ty), Ll.Id res) in
+      let* test_res_i64 = cgE_ test in
+      let* test_res = aiwf "test_res" (Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)) in
+      let* _ = B.term_block (Ll.Cbr (test_res, thn_lbl, els_lbl)) , Ll.Null in
+      let* _ = B.start_block thn_lbl , Ll.Null in
+      let* thn_op = cgE_ thn in
+      let* _ = build_store res_ty thn_op res_ptr , Ll.Null in
+      let* _ = B.term_block (Ll.Br merge_lbl) , Ll.Null in
+      let* _ = B.start_block els_lbl , Ll.Null in
+      let* els_op = cgE_ els in
+      let* _ = build_store res_ty els_op res_ptr , Ll.Null in
+      let* _ = B.term_block (Ll.Br merge_lbl) , Ll.Null in
+      let* _ = B.start_block merge_lbl , Ll.Null in
+      aiwf "if_res" (Ll.Load (res_ty, res_ptr))
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
