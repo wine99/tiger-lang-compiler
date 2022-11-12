@@ -217,6 +217,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       aiwf "arith_tmp" i
   | H.OpExp {left; right; oper; _}
     when List.exists (fun x -> x = oper) cmp_oper ->
+      (* TODO special case comparison of string *)
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
       let cnd =
@@ -295,6 +296,12 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let* _ = cgE_ thn in
       let* _ = B.term_block (Ll.Br merge_lbl) , Ll.Null in
       B.start_block merge_lbl , Ll.Null
+  | H.StringExp str ->
+      let str_id = fresh "string_lit" in
+      let str_ty = string_literal_llty str in
+      let ll_str = string_literal_llstr str in
+      ctxt.gdecls := (str_id , (str_ty, ll_str)) :: !(ctxt.gdecls) ;
+      aiwf "string" @@ Ll.Bitcast (Ll.Ptr str_ty, (Ll.Gid str_id), ptr_i8)
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
