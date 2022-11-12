@@ -9,7 +9,6 @@ module H = Habsyn
 module Ty = Types
 module S = Symbol
 module B = Cfgbuilder
-
 open Pp_habsyn
 
 module SymbolMap = Map.Make (struct
@@ -222,7 +221,6 @@ let rec cgExp ctxt (Exp {exp_base; _} as exp : H.exp) :
         | GeOp -> Ll.Sge
         | _ -> raise NotImplemented
       in
-      (* FIXME if this is returned in main, it should be converted to I64 *)
       let i = Ll.Icmp (cnd, Ll.I1, op_left, op_right) in
       aiwf "temp" i
   | H.AssignExp {var; exp} ->
@@ -230,30 +228,35 @@ let rec cgExp ctxt (Exp {exp_base; _} as exp : H.exp) :
       let* dest = cgVar ctxt var in
       let t = ty_to_llty @@ ty_of_exp exp in
       let store = Ll.Store (t, e, dest) in
-      B.add_insn (None, store), Ll.Null
+      (B.add_insn (None, store), Ll.Null)
   | H.LetExp {vardecl; body} -> (
-      match vardecl with
-      | VarDec {name; typ; init; _} ->
-          let* e = cgE_ init in
-          let* dest = cgParentLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid) name 0 in
-          let store = Ll.Store (ty_to_llty typ, e, dest) in
-          let* _ = (B.add_insn (None, store), Ll.Null) in
-          cgE_ body
-  )
-  | H.SeqExp exps -> (
+    match vardecl with
+    | VarDec {name; typ; init; _} ->
+        let* e = cgE_ init in
+        let* dest =
+          cgParentLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid)
+            name 0
+        in
+        let store = Ll.Store (ty_to_llty typ, e, dest) in
+        let* _ = (B.add_insn (None, store), Ll.Null) in
+        cgE_ body )
+  | H.SeqExp exps ->
       let rec loop exps =
         match exps with
-        | [] -> B.id_buildlet , Ll.Null
+        | [] -> (B.id_buildlet, Ll.Null)
         | [e] -> cgE_ e
-        | e :: es -> let* _ = cgE_ e in loop es
+        | e :: es ->
+            let* _ = cgE_ e in
+            loop es
       in
       loop exps
-  )
-  | H.VarExp (H.Var {ty; _} as var)->
+  | H.VarExp (H.Var {ty; _} as var) ->
       let* var_ptr = cgVar ctxt var in
       let load = Ll.Load (ty_to_llty ty, var_ptr) in
       aiwf "var_tmp" load
-  | _ -> Pp_habsyn.pp_exp exp Format.std_formatter () ; raise  NotImplemented
+  | _ ->
+      Pp_habsyn.pp_exp exp Format.std_formatter () ;
+      raise NotImplemented
 
 and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   let llvm_type = ty_to_llty ty in

@@ -14,7 +14,8 @@
 let defaultPhasesToCheck =
   let open TestPhases in
   [ (* HOIST (* uncomment the next line to enable LL testing *)
-  ; *) LL Batch
+       ; *)
+    LL Batch
   ; LL Interactive ]
 
 (* obs: for student code the above list must correspond to only one phase *)
@@ -38,7 +39,7 @@ let featureset_exclusive_flag =
   Arg.(
     value
     & opt (some (list string)) None
-    & info ["fs-list"; "feature-sets-list"] ~doc ~docv:"LIST")
+    & info ["fs-list"; "feature-sets-list"] ~doc ~docv:"LIST" )
 
 let featuresetregexp_flag =
   let doc =
@@ -47,7 +48,7 @@ let featuresetregexp_flag =
   Arg.(
     value
     & opt (some string) None
-    & info ["fs"; "feature-sets"] ~doc ~docv:"REGEXP")
+    & info ["fs"; "feature-sets"] ~doc ~docv:"REGEXP" )
 
 let init_testsets featureSetMap only overwrite fs_exclusive fs_regexp =
   DefaultTesting.defaultTestsForPhases
@@ -62,13 +63,13 @@ let init_testsets_t fs =
   Term.(
     const (init_testsets fs)
     $ only_flag $ overwrite_flag $ featureset_exclusive_flag
-    $ featuresetregexp_flag)
+    $ featuresetregexp_flag )
 
 let dummy_testsets_t =
   Term.(
     const (fun _ _ _ _ -> ())
     $ only_flag $ overwrite_flag $ featureset_exclusive_flag
-    $ featuresetregexp_flag)
+    $ featuresetregexp_flag )
 
 let () =
   Printexc.record_backtrace false ;

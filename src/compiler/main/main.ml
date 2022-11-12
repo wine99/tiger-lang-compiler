@@ -134,7 +134,7 @@ let norm_arg =
   Arg.(
     value
     & opt (enum ls) PREVIOUS
-    & info ["n"; "normalize"] ~docv:"WHICH" ~doc)
+    & info ["n"; "normalize"] ~docv:"WHICH" ~doc )
 
 let phase_arg =
   let ls =
@@ -185,7 +185,7 @@ let check file out_opt phase norm unfold language =
 let main_t =
   Term.(
     const check $ src_arg $ dst_arg $ phase_arg $ norm_arg $ unfold_arg
-    $ language_arg)
+    $ language_arg )
 
 let info =
   let doc = "Tiger AU reference compiler." in
