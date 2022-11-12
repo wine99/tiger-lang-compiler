@@ -47,6 +47,14 @@ let rec sym_of_var = function
   | H.Var {var_base= FieldVar (v, _); _} -> sym_of_var v
   | H.Var {var_base= SubscriptVar (v, _); _} -> sym_of_var v
 
+let string_literal_llty str =
+  let len = String.length str in
+  Ll.Struct [Ll.I64 ; Ll.Array (len, Ll.I8)]
+
+let string_literal_llstr str =
+  let len = String.length str in
+  Ll.GStruct [(Ll.I64 , Ll.GInt len) ; (Ll.Array (len, Ll.I8) , Ll.GString str)]
+
 let rec ty_to_llty = function
   | Ty.INT -> Ll.I64
   | Ty.NIL -> Ll.Ptr I8
@@ -220,9 +228,12 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
         | GtOp -> Ll.Sgt
         | GeOp -> Ll.Sge
         | _ -> raise NotImplemented
-      in
-      let* tmp = aiwf "cmp_tmp" @@ Ll.Icmp (cnd, Ll.I1, op_left, op_right) in
-      aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
+      in (
+      match left with
+      | H.Exp {ty; _} ->
+          let* tmp = aiwf "cmp_tmp" @@ Ll.Icmp (cnd, (ty_to_llty ty), op_left, op_right) in
+          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
+      )
   | H.AssignExp {var; exp} ->
       let* e = cgE_ exp in
       let* dest = cgVar ctxt var in
@@ -262,7 +273,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let merge_lbl = fresh "merge" in
       let* res_ptr = (B.add_alloca (res, res_ty), Ll.Id res) in
       let* test_res_i64 = cgE_ test in
-      let* test_res = aiwf "test_res" (Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)) in
+      let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
       let* _ = B.term_block (Ll.Cbr (test_res, thn_lbl, els_lbl)) , Ll.Null in
       let* _ = B.start_block thn_lbl , Ll.Null in
       let* thn_op = cgE_ thn in
@@ -273,7 +284,17 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let* _ = build_store res_ty els_op res_ptr , Ll.Null in
       let* _ = B.term_block (Ll.Br merge_lbl) , Ll.Null in
       let* _ = B.start_block merge_lbl , Ll.Null in
-      aiwf "if_res" (Ll.Load (res_ty, res_ptr))
+      aiwf "if_res" @@ Ll.Load (res_ty, res_ptr)
+  | H.IfExp {test; thn; els= None} ->
+      let thn_lbl = fresh "then" in
+      let merge_lbl = fresh "merge" in
+      let* test_res_i64 = cgE_ test in
+      let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
+      let* _ = B.term_block (Ll.Cbr (test_res, thn_lbl, merge_lbl)) , Ll.Null in
+      let* _ = B.start_block thn_lbl , Ll.Null in
+      let* _ = cgE_ thn in
+      let* _ = B.term_block (Ll.Br merge_lbl) , Ll.Null in
+      B.start_block merge_lbl , Ll.Null
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
