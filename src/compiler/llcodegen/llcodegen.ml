@@ -206,7 +206,7 @@ let rec cgExp ctxt (Exp {exp_base; _} as exp : H.exp) :
         | _ -> raise NotImplemented
       in
       let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
-      aiwf "temp" i
+      aiwf "arith_tmp" i
   | H.OpExp {left; right; oper; _}
     when List.exists (fun x -> x = oper) cmp_oper ->
       let* op_left = cgE_ left in
@@ -221,8 +221,8 @@ let rec cgExp ctxt (Exp {exp_base; _} as exp : H.exp) :
         | GeOp -> Ll.Sge
         | _ -> raise NotImplemented
       in
-      let i = Ll.Icmp (cnd, Ll.I1, op_left, op_right) in
-      aiwf "temp" i
+      let* tmp = aiwf "cmp_tmp" @@ Ll.Icmp (cnd, Ll.I1, op_left, op_right) in
+      aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
   | H.AssignExp {var; exp} ->
       let* e = cgE_ exp in
       let* dest = cgVar ctxt var in
