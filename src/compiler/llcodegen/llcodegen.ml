@@ -229,22 +229,21 @@ let rec cgExp ctxt (Exp {exp_base; _} as exp : H.exp) :
       let* e = cgE_ exp in
       let* dest = cgVar ctxt var in
       let t = ty_to_llty @@ ty_of_exp exp in
-      let inst = Ll.Store (t, e, dest) in
-      aiwf (S.name @@ sym_of_var var) inst
+      let store = Ll.Store (t, e, dest) in
+      B.add_insn (None, store), Ll.Null
   | H.LetExp {vardecl; body} -> (
       match vardecl with
       | VarDec {name; typ; init; _} ->
-          print_string (S.name name);
           let* e = cgE_ init in
           let* dest = cgParentLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid) name 0 in
-          let* _ = (id, Ll.Store (ty_to_llty typ, e, dest)) in
-          print_string " asfasdf ";
+          let store = Ll.Store (ty_to_llty typ, e, dest) in
+          let* _ = (B.add_insn (None, store), Ll.Null) in
           cgE_ body
   )
   | H.SeqExp exps -> (
       let rec loop exps =
         match exps with
-        | [] -> raise CodeGenerationBug
+        | [] -> B.id_buildlet , Ll.Null
         | [e] -> cgE_ e
         | e :: es -> let* _ = cgE_ e in loop es
       in
@@ -252,8 +251,8 @@ let rec cgExp ctxt (Exp {exp_base; _} as exp : H.exp) :
   )
   | H.VarExp (H.Var {ty; _} as var)->
       let* var_ptr = cgVar ctxt var in
-      (* TODO how do I return a operand monad where I dont have one *)
-      aiwf "tmp" (Ll.Load (ty_to_llty ty, var_ptr))
+      let load = Ll.Load (ty_to_llty ty, var_ptr) in
+      aiwf "var_tmp" load
   | _ -> Pp_habsyn.pp_exp exp Format.std_formatter () ; raise  NotImplemented
 
 and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
