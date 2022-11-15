@@ -313,6 +313,21 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let build, ops = loop args in
       (* find the right static link using ctxt and lvl_diff *)
       raise NotImplemented
+  | H.WhileExp {test; body} ->
+    let test_lbl = fresh "test" in
+    let body_lbl = fresh "body" in
+    let merge_lbl = fresh "merge" in
+    (* Test block *)
+    let* _ = (B.start_block test_lbl, Ll.Null) in
+    let* test_res_i64 = cgE_ test in
+    let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
+    let* _ = (B.term_block (Ll.Cbr (test_res, body_lbl, merge_lbl)), Ll.Null) in
+    (* Body block *)
+    let* _ = (B.start_block body_lbl, Ll.Null) in
+    let* _ = cgE_ body in
+    let* _ = (B.term_block (Ll.Br test_lbl), Ll.Null) in
+    (* Merge block *)
+    (B.start_block merge_lbl, Ll.Null)
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
