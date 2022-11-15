@@ -232,9 +232,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       in
       match left with
       | H.Exp {ty; _} ->
-          let* tmp =
-            aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
-          in
+          let* tmp = aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right) in
           aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) )
   | H.AssignExp {var; exp} ->
       let* e = cgE_ exp in
@@ -275,12 +273,8 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let merge_lbl = fresh "merge" in
       let* res_ptr = (B.add_alloca (res, res_ty), Ll.Id res) in
       let* test_res_i64 = cgE_ test in
-      let* test_res =
-        aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)
-      in
-      let* _ =
-        (B.term_block (Ll.Cbr (test_res, thn_lbl, els_lbl)), Ll.Null)
-      in
+      let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
+      let* _ = (B.term_block (Ll.Cbr (test_res, thn_lbl, els_lbl)), Ll.Null) in
       let* _ = (B.start_block thn_lbl, Ll.Null) in
       let* thn_op = cgE_ thn in
       let* _ = (build_store res_ty thn_op res_ptr, Ll.Null) in
@@ -295,12 +289,8 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let thn_lbl = fresh "then" in
       let merge_lbl = fresh "merge" in
       let* test_res_i64 = cgE_ test in
-      let* test_res =
-        aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)
-      in
-      let* _ =
-        (B.term_block (Ll.Cbr (test_res, thn_lbl, merge_lbl)), Ll.Null)
-      in
+      let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
+      let* _ = (B.term_block (Ll.Cbr (test_res, thn_lbl, merge_lbl)), Ll.Null) in
       let* _ = (B.start_block thn_lbl, Ll.Null) in
       let* _ = cgE_ thn in
       let* _ = (B.term_block (Ll.Br merge_lbl), Ll.Null) in
@@ -324,28 +314,25 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       (* find the right static link using ctxt and lvl_diff *)
       raise NotImplemented
   | H.WhileExp {test; body} ->
-      let test_lbl = fresh "test" in
-      let body_lbl = fresh "body" in
-      let merge_lbl = fresh "merge" in
-      (* Test block *)
-      let* _ = (B.start_block test_lbl, Ll.Null) in
-      let* test_res_i64 = cgE_ test in
-      let* test_res =
-        aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)
-      in
-      let* _ =
-        (B.term_block (Ll.Cbr (test_res, body_lbl, merge_lbl)), Ll.Null)
-      in
-      (* Body block *)
-      let* _ = (B.start_block body_lbl, Ll.Null) in
-      let* _ = cgExp {ctxt with break_lbl= Some merge_lbl} body in
-      let* _ = (B.term_block (Ll.Br test_lbl), Ll.Null) in
-      (* Merge block *)
-      (B.start_block merge_lbl, Ll.Null)
+    let test_lbl = fresh "test" in
+    let body_lbl = fresh "body" in
+    let merge_lbl = fresh "merge" in
+    (* Test block *)
+    let* _ = (B.start_block test_lbl, Ll.Null) in
+    let* test_res_i64 = cgE_ test in
+    let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
+    let* _ = (B.term_block (Ll.Cbr (test_res, body_lbl, merge_lbl)), Ll.Null) in
+    (* Body block *)
+    let* _ = (B.start_block body_lbl, Ll.Null) in
+    let* _ = cgExp {ctxt with break_lbl = Some merge_lbl} body in
+    let* _ = (B.term_block (Ll.Br test_lbl), Ll.Null) in
+    (* Merge block *)
+    (B.start_block merge_lbl, Ll.Null)
   | H.BreakExp -> (
     match ctxt.break_lbl with
-    | None -> raise NotImplemented
-    | Some merge_lbl -> (B.term_block (Ll.Br merge_lbl), Ll.Null) )
+    | None           -> raise NotImplemented (* Should not be allowed *)
+    | Some merge_lbl -> (B.term_block (Ll.Br merge_lbl), Ll.Null)
+  )
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
