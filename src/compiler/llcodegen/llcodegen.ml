@@ -374,6 +374,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let body_lbl = fresh "body" in
       let merge_lbl = fresh "merge" in
       (* Test block *)
+      let* _ = (B.term_block (Ll.Br test_lbl), Ll.Null) in
       let* _ = (B.start_block test_lbl, Ll.Null) in
       let* test_res_i64 = cgE_ test in
       let* test_res =
