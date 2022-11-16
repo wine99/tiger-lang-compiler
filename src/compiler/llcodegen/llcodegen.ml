@@ -169,11 +169,22 @@ let build_store t o1 o2 = B.add_insn (None, Ll.Store (t, o1, o2))
 
 let gep_0 ty op i = Ll.Gep (ty, op, [Const 0; Const i])
 
-let ar_oper =
-  [Oper.PlusOp; Oper.MinusOp; Oper.TimesOp; Oper.DivideOp]
+let ar_oper = [Oper.PlusOp; Oper.MinusOp; Oper.TimesOp; Oper.DivideOp]
 
 let cmp_oper =
   [Oper.EqOp; Oper.NeqOp; Oper.LtOp; Oper.LeOp; Oper.GtOp; Oper.GeOp]
+
+let global_functions =
+  [ "print"
+  ; "flush"
+  ; "getChar"
+  ; "ord"
+  ; "chr"
+  ; "size"
+  ; "substring"
+  ; "concat"
+  ; "not"
+  ; "tigerexit" ]
 
 let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
     B.buildlet * Ll.operand (* Alternatively: Ll.operand m *) =
@@ -214,19 +225,20 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       in
       let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
       aiwf "arith_tmp" i
-  | H.OpExp {left; right; oper ;_} when oper = Oper.ExponentOp ->
-    let* op_left = cgE_ left in
-    let* op_right = cgE_ right in
-    let bop = "exponent" in
-    let func = Ll.Gid (S.symbol bop) in
-    aiwf "ret" (Ll.Call (Ll.I64, func, [(Ll.I64, op_left) ; (Ll.I64, op_right)]))   
+  | H.OpExp {left; right; oper; _} when oper = Oper.ExponentOp ->
+      let* op_left = cgE_ left in
+      let* op_right = cgE_ right in
+      let bop = "exponent" in
+      let func = Ll.Gid (S.symbol bop) in
+      aiwf "ret"
+        (Ll.Call (Ll.I64, func, [(Ll.I64, op_left); (Ll.I64, op_right)]))
   | H.OpExp {left; right; oper; _}
     when List.exists (fun x -> x = oper) cmp_oper -> (
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
-      ( (* TODO special case comparison of string *)
-        match left with
-        | H.Exp {ty; _} when ty = Ty.STRING ->
+      (* TODO special case comparison of string *)
+      match left with
+      | H.Exp {ty; _} when ty = Ty.STRING ->
           let cnd =
             match oper with
             | EqOp -> "stringEqual"
@@ -236,10 +248,11 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
             | GtOp -> "stringGreater"
             | GeOp -> "stringGreaterEq"
             | _ -> raise NotImplemented
-          in 
+          in
           let func = Ll.Gid (S.symbol cnd) in
-          aiwf "ret" (Ll.Call (Ll.I64, func, [(ptr_i8, op_left) ; (ptr_i8, op_right)]))
-        | H.Exp {ty; _} ->
+          aiwf "ret"
+            (Ll.Call (Ll.I64, func, [(ptr_i8, op_left); (ptr_i8, op_right)]))
+      | H.Exp {ty; _} ->
           let cnd =
             match oper with
             | EqOp -> Ll.Eq
@@ -249,11 +262,11 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
             | GtOp -> Ll.Sgt
             | GeOp -> Ll.Sge
             | _ -> raise NotImplemented
-          in 
-          let* tmp = aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right) in
-          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) 
-        )
-      )
+          in
+          let* tmp =
+            aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
+          in
+          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) )
   | H.AssignExp {var; exp} ->
       let* e = cgE_ exp in
       let* dest = cgVar ctxt var in
@@ -293,8 +306,12 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let merge_lbl = fresh "merge" in
       let* res_ptr = (B.add_alloca (res, res_ty), Ll.Id res) in
       let* test_res_i64 = cgE_ test in
-      let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
-      let* _ = (B.term_block (Ll.Cbr (test_res, thn_lbl, els_lbl)), Ll.Null) in
+      let* test_res =
+        aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)
+      in
+      let* _ =
+        (B.term_block (Ll.Cbr (test_res, thn_lbl, els_lbl)), Ll.Null)
+      in
       let* _ = (B.start_block thn_lbl, Ll.Null) in
       let* thn_op = cgE_ thn in
       let* _ = (build_store res_ty thn_op res_ptr, Ll.Null) in
@@ -309,8 +326,12 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let thn_lbl = fresh "then" in
       let merge_lbl = fresh "merge" in
       let* test_res_i64 = cgE_ test in
-      let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
-      let* _ = (B.term_block (Ll.Cbr (test_res, thn_lbl, merge_lbl)), Ll.Null) in
+      let* test_res =
+        aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)
+      in
+      let* _ =
+        (B.term_block (Ll.Cbr (test_res, thn_lbl, merge_lbl)), Ll.Null)
+      in
       let* _ = (B.start_block thn_lbl, Ll.Null) in
       let* _ = cgE_ thn in
       let* _ = (B.term_block (Ll.Br merge_lbl), Ll.Null) in
@@ -325,34 +346,43 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let rec loop args =
         match args with
         | [] -> (id, [])
-        | a :: args -> (
+        | (H.Exp {ty= ty_a; _} as a) :: args -> (
             let build, op = cgE_ a in
-            match loop args with builds, ops -> (build $> builds, op :: ops)
+            match loop args with
+            | builds, ops -> (build $> builds, (ty_to_llty ty_a, op) :: ops)
             )
       in
-      let build, ops = loop args in
-      (* find the right static link using ctxt and lvl_diff *)
-      raise NotImplemented
+      let* ops = loop args in
+      let is_global = List.exists (( = ) (S.name func)) global_functions in
+      if is_global then
+        let func = Ll.Gid func in
+        aiwf "ret" (Ll.Call (Ll.I64, func, ops))
+      else
+        (* find the right static link using ctxt and lvl_diff *)
+        raise NotImplemented
   | H.WhileExp {test; body} ->
-    let test_lbl = fresh "test" in
-    let body_lbl = fresh "body" in
-    let merge_lbl = fresh "merge" in
-    (* Test block *)
-    let* _ = (B.start_block test_lbl, Ll.Null) in
-    let* test_res_i64 = cgE_ test in
-    let* test_res = aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1) in
-    let* _ = (B.term_block (Ll.Cbr (test_res, body_lbl, merge_lbl)), Ll.Null) in
-    (* Body block *)
-    let* _ = (B.start_block body_lbl, Ll.Null) in
-    let* _ = cgExp {ctxt with break_lbl = Some merge_lbl} body in
-    let* _ = (B.term_block (Ll.Br test_lbl), Ll.Null) in
-    (* Merge block *)
-    (B.start_block merge_lbl, Ll.Null)
+      let test_lbl = fresh "test" in
+      let body_lbl = fresh "body" in
+      let merge_lbl = fresh "merge" in
+      (* Test block *)
+      let* _ = (B.start_block test_lbl, Ll.Null) in
+      let* test_res_i64 = cgE_ test in
+      let* test_res =
+        aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)
+      in
+      let* _ =
+        (B.term_block (Ll.Cbr (test_res, body_lbl, merge_lbl)), Ll.Null)
+      in
+      (* Body block *)
+      let* _ = (B.start_block body_lbl, Ll.Null) in
+      let* _ = cgExp {ctxt with break_lbl= Some merge_lbl} body in
+      let* _ = (B.term_block (Ll.Br test_lbl), Ll.Null) in
+      (* Merge block *)
+      (B.start_block merge_lbl, Ll.Null)
   | H.BreakExp -> (
     match ctxt.break_lbl with
-    | None           -> raise NotImplemented (* Should not be allowed *)
-    | Some merge_lbl -> (B.term_block (Ll.Br merge_lbl), Ll.Null)
-  )
+    | None -> raise NotImplemented (* Should not be allowed *)
+    | Some merge_lbl -> (B.term_block (Ll.Br merge_lbl), Ll.Null) )
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
