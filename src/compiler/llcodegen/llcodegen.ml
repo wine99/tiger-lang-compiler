@@ -175,16 +175,16 @@ let cmp_oper =
   [Oper.EqOp; Oper.NeqOp; Oper.LtOp; Oper.LeOp; Oper.GtOp; Oper.GeOp]
 
 let global_functions =
-  [ "print", Ll.Void
-  ; "flush", Ll.Void
-  ; "getChar", ptr_i8
-  ; "ord", Ll.I64
-  ; "chr", ptr_i8
-  ; "size", Ll.I64
-  ; "substring", ptr_i8
-  ; "concat", ptr_i8
-  ; "not", Ll.I64
-  ; "tigerexit", Ll.Void ]
+  [ ("print", Ll.Void)
+  ; ("flush", Ll.Void)
+  ; ("getChar", ptr_i8)
+  ; ("ord", Ll.I64)
+  ; ("chr", ptr_i8)
+  ; ("size", Ll.I64)
+  ; ("substring", ptr_i8)
+  ; ("concat", ptr_i8)
+  ; ("not", Ll.I64)
+  ; ("tigerexit", Ll.Void) ]
 
 let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
     B.buildlet * Ll.operand (* Alternatively: Ll.operand m *) =
@@ -211,8 +211,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       (* the above can be rewritten using the monadic interface and aux functions
          as follows *)
   *)
-  | H.OpExp {left; right; oper; _}
-    when List.exists (fun x -> x = oper) ar_oper ->
+  | H.OpExp {left; right; oper; _} when List.exists (( = ) oper) ar_oper ->
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
       let bop =
@@ -232,8 +231,8 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let func = Ll.Gid (S.symbol bop) in
       aiwf "ret"
         (Ll.Call (Ll.I64, func, [(Ll.I64, op_left); (Ll.I64, op_right)]))
-  | H.OpExp {left; right; oper; _}
-    when List.exists (fun x -> x = oper) cmp_oper -> (
+  | H.OpExp {left; right; oper; _} when List.exists (( = ) oper) cmp_oper
+    -> (
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
       (* TODO special case comparison of string *)
@@ -278,8 +277,8 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
     | VarDec {name; typ; init; _} ->
         let* e = cgE_ init in
         let* dest =
-          cgVarLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid)
-            name 0
+          cgVarLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid) name
+            0
         in
         let store = Ll.Store (ty_to_llty typ, e, dest) in
         let* _ = (B.add_insn (None, store), Ll.Null) in
@@ -298,8 +297,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let* var_ptr = cgVar ctxt var in
       let load = Ll.Load (ty_to_llty ty, var_ptr) in
       aiwf "var_tmp" load
-  | H.IfExp {test; thn; els= Some els} ->
-      cgIfThenElse ctxt test thn els ty
+  | H.IfExp {test; thn; els= Some els} -> cgIfThenElse ctxt test thn els ty
   | H.IfExp {test; thn; els= None} ->
       let thn_lbl = fresh "then" in
       let merge_lbl = fresh "merge" in
@@ -308,11 +306,11 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
         aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)
       in
       let* _ =
-        (B.term_block (Ll.Cbr (test_res, thn_lbl, merge_lbl)), Ll.Null)
+        (B.term_block @@ Ll.Cbr (test_res, thn_lbl, merge_lbl), Ll.Null)
       in
       let* _ = (B.start_block thn_lbl, Ll.Null) in
       let* _ = cgE_ thn in
-      let* _ = (B.term_block (Ll.Br merge_lbl), Ll.Null) in
+      let* _ = (B.term_block @@ Ll.Br merge_lbl, Ll.Null) in
       (B.start_block merge_lbl, Ll.Null)
   | H.StringExp str ->
       let str_id = fresh "string_lit" in
@@ -320,7 +318,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let ll_str = string_literal_llstr str in
       ctxt.gdecls := (str_id, (str_ty, ll_str)) :: !(ctxt.gdecls) ;
       aiwf "string" @@ Ll.Bitcast (Ll.Ptr str_ty, Ll.Gid str_id, ptr_i8)
-  | H.CallExp {func; lvl_diff; args} ->
+  | H.CallExp {func; lvl_diff; args} -> (
       let rec loop args =
         match args with
         | [] -> (id, [])
@@ -331,55 +329,64 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
             )
       in
       let* ops = loop args in
-      let is_global = List.find_opt (fun x -> let (name, _) = x in name = (S.name func)) global_functions in
-      (match is_global with
-        | Some (_, ret_ty) -> (
+      let is_global =
+        List.find_opt
+          (fun x ->
+            let name, _ = x in
+            name = S.name func )
+          global_functions
+      in
+      match is_global with
+      | Some (_, ret_ty) ->
           let func = Ll.Gid func in
           let locals = ctxt.summary.locals_uid in
           let locals_type = ctxt.summary.locals_tid in
-          let* sl = aiwf "SL" @@ Ll.Bitcast (Ll.Ptr (Ll.Namedt locals_type) , Ll.Id locals, ptr_i8) in
-          if ret_ty = Ll.Void then (
-            B.add_insn (None, Ll.Call (ret_ty, func, (ptr_i8, sl) ::  ops)), Ll.Null
-          )
-          else (
-            aiwf "ret" (Ll.Call (ret_ty, func, (ptr_i8, sl) ::  ops))
-          )
-        )
-        | None ->
-            let locals = Ll.Id ctxt.summary.locals_uid in
-            let* sl_ptr = cgSlLookup ctxt ctxt.summary locals lvl_diff in
-            let sl_ptr_ty = Ll.Ptr (getSlType ctxt ctxt.summary lvl_diff) in
-            let ret_ty = ty_to_llty ty in
-            let func = Ll.Gid func in
-            if ret_ty = Ll.Void then
-              B.add_insn (None, Ll.Call (ret_ty, func, (sl_ptr_ty, sl_ptr) :: ops)), Ll.Null
-            else
-              aiwf "ret" (Ll.Call (ret_ty, func, (sl_ptr_ty, sl_ptr) ::  ops))
+          let* sl =
+            aiwf "SL"
+            @@ Ll.Bitcast
+                 (Ll.Ptr (Ll.Namedt locals_type), Ll.Id locals, ptr_i8)
+          in
+          if ret_ty = Ll.Void then
+            ( B.add_insn (None, Ll.Call (ret_ty, func, (ptr_i8, sl) :: ops))
+            , Ll.Null )
+          else aiwf "ret" @@ Ll.Call (ret_ty, func, (ptr_i8, sl) :: ops)
+      | None ->
+          let locals = Ll.Id ctxt.summary.locals_uid in
+          let* sl_ptr = cgSlLookup ctxt ctxt.summary locals lvl_diff in
+          let sl_ptr_ty = Ll.Ptr (getSlType ctxt ctxt.summary lvl_diff) in
+          let ret_ty = ty_to_llty ty in
+          let func = Ll.Gid func in
+          if ret_ty = Ll.Void then
+            ( B.add_insn
+                (None, Ll.Call (ret_ty, func, (sl_ptr_ty, sl_ptr) :: ops))
+            , Ll.Null )
+          else
+            aiwf "ret" @@ Ll.Call (ret_ty, func, (sl_ptr_ty, sl_ptr) :: ops)
       )
   | H.WhileExp {test; body} ->
       let test_lbl = fresh "test" in
       let body_lbl = fresh "body" in
       let merge_lbl = fresh "merge" in
       (* Test block *)
-      let* _ = (B.term_block (Ll.Br test_lbl), Ll.Null) in
+      let* _ = (B.term_block @@ Ll.Br test_lbl, Ll.Null) in
       let* _ = (B.start_block test_lbl, Ll.Null) in
       let* test_res_i64 = cgE_ test in
       let* test_res =
         aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)
       in
       let* _ =
-        (B.term_block (Ll.Cbr (test_res, body_lbl, merge_lbl)), Ll.Null)
+        (B.term_block @@ Ll.Cbr (test_res, body_lbl, merge_lbl), Ll.Null)
       in
       (* Body block *)
       let* _ = (B.start_block body_lbl, Ll.Null) in
       let* _ = cgExp {ctxt with break_lbl= Some merge_lbl} body in
-      let* _ = (B.term_block (Ll.Br test_lbl), Ll.Null) in
+      let* _ = (B.term_block @@ Ll.Br test_lbl, Ll.Null) in
       (* Merge block *)
       (B.start_block merge_lbl, Ll.Null)
   | H.BreakExp -> (
     match ctxt.break_lbl with
     | None -> raise NotImplemented (* Should not be allowed *)
-    | Some merge_lbl -> (B.term_block (Ll.Br merge_lbl), Ll.Null) )
+    | Some merge_lbl -> (B.term_block @@ Ll.Br merge_lbl, Ll.Null) )
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
@@ -391,8 +398,7 @@ and cgIfThenElse ctxt test thn els ty =
   let merge_lbl = fresh "merge" in
   let res_ty = ty_to_llty ty in
   let* res_ptr =
-    if res_ty = Ll.Void then
-      return Ll.Null
+    if res_ty = Ll.Void then return Ll.Null
     else
       let res = fresh "local_ifs" in
       (B.add_alloca (res, res_ty), Ll.Id res)
@@ -401,32 +407,24 @@ and cgIfThenElse ctxt test thn els ty =
   let* test_res =
     aiwf "test_res" @@ Ll.Icmp (Ll.Eq, Ll.I64, test_res_i64, Ll.Const 1)
   in
-  let* _ =
-    (B.term_block (Ll.Cbr (test_res, thn_lbl, els_lbl)), Ll.Null)
-  in
+  let* _ = (B.term_block @@ Ll.Cbr (test_res, thn_lbl, els_lbl), Ll.Null) in
   let* _ = (B.start_block thn_lbl, Ll.Null) in
   let* thn_op = cgE_ thn in
   let* _ =
-    if res_ty = Ll.Void then
-      return Ll.Null
-    else
-      (build_store res_ty thn_op res_ptr, Ll.Null)
+    if res_ty = Ll.Void then return Ll.Null
+    else (build_store res_ty thn_op res_ptr, Ll.Null)
   in
-  let* _ = (B.term_block (Ll.Br merge_lbl), Ll.Null) in
+  let* _ = (B.term_block @@ Ll.Br merge_lbl, Ll.Null) in
   let* _ = (B.start_block els_lbl, Ll.Null) in
   let* els_op = cgE_ els in
   let* _ =
-    if res_ty = Ll.Void then
-      return Ll.Null
-    else
-      (build_store res_ty els_op res_ptr, Ll.Null)
+    if res_ty = Ll.Void then return Ll.Null
+    else (build_store res_ty els_op res_ptr, Ll.Null)
   in
-  let* _ = (B.term_block (Ll.Br merge_lbl), Ll.Null) in
+  let* _ = (B.term_block @@ Ll.Br merge_lbl, Ll.Null) in
   let* _ = (B.start_block merge_lbl, Ll.Null) in
-  if res_ty = Ll.Void then
-    return Ll.Null
-  else
-    aiwf "if_res" @@ Ll.Load (res_ty, res_ptr)
+  if res_ty = Ll.Void then return Ll.Null
+  else aiwf "if_res" @@ Ll.Load (res_ty, res_ptr)
 
 and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   let llvm_type = ty_to_llty ty in
@@ -469,26 +467,24 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
 *)
 
 (* Usage: pass locals to parent_ptr *)
-and cgVarLookup ctxt summary (parent_ptr: Ll.operand) sym n =
+and cgVarLookup ctxt summary (parent_ptr : Ll.operand) sym n =
   cgSlOrVarLookup ctxt summary parent_ptr (Some sym) n
 
 (* Usage: pass locals to parent_ptr *)
-and cgSlLookup ctxt summary (parent_ptr: Ll.operand) n =
+and cgSlLookup ctxt summary (parent_ptr : Ll.operand) n =
   cgSlOrVarLookup ctxt summary parent_ptr None n
 
 (* This function either return a variable pointer or a SL pointer *)
-and cgSlOrVarLookup ctxt summary (parent_ptr: Ll.operand) (sym: S.symbol option) =
-  function
+and cgSlOrVarLookup ctxt summary (parent_ptr : Ll.operand)
+    (sym : S.symbol option) = function
   | 0 -> (
-      match sym with
-      | None ->
-          return parent_ptr
-      | Some sym ->
-          aiwf
-            (S.name sym ^ "_ptr")
-            (gep_0 (Namedt summary.locals_tid) parent_ptr
-              (summary.offset_of_symbol sym) )
-  )
+    match sym with
+    | None -> return parent_ptr
+    | Some sym ->
+        aiwf
+          (S.name sym ^ "_ptr")
+          (gep_0 (Namedt summary.locals_tid) parent_ptr
+             (summary.offset_of_symbol sym) ) )
   | n ->
       let parent_sym =
         match summary.parent_opt with
@@ -504,13 +500,17 @@ and cgSlOrVarLookup ctxt summary (parent_ptr: Ll.operand) (sym: S.symbol option)
       let* parent_parent_ptr =
         aiwf
           (S.name parent_sym ^ "_ptr")
-          (Ll.Load (Ptr (Namedt parent_summary.locals_tid), parent_parent_ptrptr))
+          (Ll.Load
+             (Ptr (Namedt parent_summary.locals_tid), parent_parent_ptrptr)
+          )
       in
       cgSlOrVarLookup ctxt parent_summary parent_parent_ptr sym (n - 1)
 
-and getSlType ctxt summary =
-  function
-  | 0 -> print_string "locals_tid: "; print_string @@ S.name summary.locals_tid; Ll.Namedt summary.locals_tid
+and getSlType ctxt summary = function
+  | 0 ->
+      print_string "locals_tid: " ;
+      print_string @@ S.name summary.locals_tid ;
+      Ll.Namedt summary.locals_tid
   | n ->
       let parent_sym =
         match summary.parent_opt with
@@ -519,7 +519,6 @@ and getSlType ctxt summary =
       in
       let parent_summary = SymbolMap.find parent_sym ctxt.senv in
       getSlType ctxt parent_summary (n - 1)
-
 
 (* --- From this point on the code requires no changes --- *)
 
