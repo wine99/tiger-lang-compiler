@@ -278,7 +278,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
     | VarDec {name; typ; init; _} ->
         let* e = cgE_ init in
         let* dest =
-          cgParentLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid)
+          cgVarLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid)
             name 0
         in
         let store = Ll.Store (ty_to_llty typ, e, dest) in
@@ -355,19 +355,28 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       let* ops = loop args in
       let is_global = List.find_opt (fun x -> let (name, _) = x in name = (S.name func)) global_functions in
       (match is_global with
-        | None -> raise NotImplemented (* find the right static link using ctxt and lvl_diff *)
         | Some (_, ret_ty) -> (
           let func = Ll.Gid func in
           let locals = ctxt.summary.locals_uid in
           let locals_type = ctxt.summary.locals_tid in
-          let* cast = aiwf "SL" @@ Ll.Bitcast (Ll.Ptr (Ll.Namedt locals_type) , Ll.Id locals, ptr_i8) in
+          let* sl = aiwf "SL" @@ Ll.Bitcast (Ll.Ptr (Ll.Namedt locals_type) , Ll.Id locals, ptr_i8) in
           if ret_ty = Ll.Void then (
-            B.add_insn (None, Ll.Call (ret_ty, func, (ptr_i8, cast) ::  ops)), Ll.Null
+            B.add_insn (None, Ll.Call (ret_ty, func, (ptr_i8, sl) ::  ops)), Ll.Null
           )
           else (
-            aiwf "ret" (Ll.Call (ret_ty, func, (ptr_i8, cast) ::  ops))
+            aiwf "ret" (Ll.Call (ret_ty, func, (ptr_i8, sl) ::  ops))
           )
         )
+        | None ->
+            let locals = Ll.Id ctxt.summary.locals_uid in
+            let* sl_ptr = cgSlLookup ctxt ctxt.summary locals lvl_diff in
+            let sl_ptr_ty = Ll.Ptr (getSlType ctxt ctxt.summary lvl_diff) in
+            let ret_ty = ty_to_llty ty in
+            let func = Ll.Gid func in
+            if ret_ty = Ll.Void then
+              B.add_insn (None, Ll.Call (ret_ty, func, (sl_ptr_ty, sl_ptr) :: ops)), Ll.Null
+            else
+              aiwf "ret" (Ll.Call (ret_ty, func, (sl_ptr_ty, sl_ptr) ::  ops))
       )
   | H.WhileExp {test; body} ->
       let test_lbl = fresh "test" in
@@ -401,8 +410,8 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   let llvm_type = ty_to_llty ty in
   match var_base with
   | AccessVar (i, sym) ->
-      let op = Ll.Id ctxt.summary.locals_uid in
-      cgParentLookup ctxt ctxt.summary op sym i
+      let locals = Ll.Id ctxt.summary.locals_uid in
+      cgVarLookup ctxt ctxt.summary locals sym i
   | FieldVar (var, sym) -> raise NotImplemented
   | SubscriptVar (v, exp) ->
       let* cg_var = cgVar ctxt v in
@@ -437,14 +446,27 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
      loop op fdecl_summary i
 *)
 
-(* TODO change the function name to cgVarLookup *)
-and cgParentLookup (ctxt : context) (summary : fdecl_summary) parent_ptr sym
-    = function
-  | 0 ->
-      aiwf
-        (S.name sym ^ "_ptr")
-        (gep_0 (Namedt summary.locals_tid) parent_ptr
-           (summary.offset_of_symbol sym) )
+(* Usage: pass locals to parent_ptr *)
+and cgVarLookup ctxt summary (parent_ptr: Ll.operand) sym n =
+  cgSlOrVarLookup ctxt summary parent_ptr (Some sym) n
+
+(* Usage: pass locals to parent_ptr *)
+and cgSlLookup ctxt summary (parent_ptr: Ll.operand) n =
+  cgSlOrVarLookup ctxt summary parent_ptr None n
+
+(* This function either return a variable pointer or a SL pointer *)
+and cgSlOrVarLookup ctxt summary (parent_ptr: Ll.operand) (sym: S.symbol option) =
+  function
+  | 0 -> (
+      match sym with
+      | None ->
+          return parent_ptr
+      | Some sym ->
+          aiwf
+            (S.name sym ^ "_ptr")
+            (gep_0 (Namedt summary.locals_tid) parent_ptr
+              (summary.offset_of_symbol sym) )
+  )
   | n ->
       let parent_sym =
         match summary.parent_opt with
@@ -452,12 +474,30 @@ and cgParentLookup (ctxt : context) (summary : fdecl_summary) parent_ptr sym
         | None -> raise CodeGenerationBug
       in
       let parent_summary = SymbolMap.find parent_sym ctxt.senv in
+      let* parent_parent_ptrptr =
+        aiwf
+          (S.name parent_sym ^ "_ptrptr")
+          (gep_0 (Namedt summary.locals_tid) parent_ptr 0)
+      in
       let* parent_parent_ptr =
         aiwf
           (S.name parent_sym ^ "_ptr")
-          (gep_0 (Namedt summary.locals_tid) parent_ptr 0)
+          (Ll.Load (Ptr (Namedt parent_summary.locals_tid), parent_parent_ptrptr))
       in
-      cgParentLookup ctxt parent_summary parent_parent_ptr sym (n - 1)
+      cgSlOrVarLookup ctxt parent_summary parent_parent_ptr sym (n - 1)
+
+and getSlType ctxt summary =
+  function
+  | 0 -> print_string "locals_tid: "; print_string @@ S.name summary.locals_tid; Ll.Namedt summary.locals_tid
+  | n ->
+      let parent_sym =
+        match summary.parent_opt with
+        | Some sym -> sym
+        | None -> raise CodeGenerationBug
+      in
+      let parent_summary = SymbolMap.find parent_sym ctxt.senv in
+      getSlType ctxt parent_summary (n - 1)
+
 
 (* --- From this point on the code requires no changes --- *)
 
@@ -530,6 +570,10 @@ let cg_fdecl senv uenv gdecls (H.Fdecl {name; args; result; body; _}) =
   in
   let copy_one_arg (name, ty) =
     (* A buildlet for copying one argument *)
+    print_string @@ S.name name ;
+    print_newline () ;
+    print_int @@ offset_of_symbol name ;
+    print_newline () ;
     let build_gep, op_gep =
       aiwf "arg"
         (gep_0 (* Use GEP to find where to store the argument *)

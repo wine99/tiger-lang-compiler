@@ -208,17 +208,17 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
         in
         let ctxt' = {ctxt with level; name; venv} in
         let parent_opt = Some ctxt.name in
-        let h_body = hoist_exp ctxt' body in
-        let locals = !(ctxt.locals_ref) in
         ctxt.locals_ref := old_locals ;
         let args =
           List.map
             (fun (A.Arg {name= n; escape; ty; pos= p}) ->
+              ctxt.locals_ref := (n, ty) :: !(ctxt.locals_ref) ;
               H.Arg {name= n; escape; ty; pos= p} )
             args
         in
+        let h_body = hoist_exp ctxt' body in
         let hoisted_fdecl =
-          H.Fdecl {name; args; result; body= h_body; pos; parent_opt; locals}
+          H.Fdecl {name; args; result; body= h_body; pos; parent_opt; locals= !(ctxt.locals_ref)}
         in
         emit_fdecl ctxt.writer hoisted_fdecl ;
         {ctxt_acc with venv}
