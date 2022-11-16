@@ -657,7 +657,6 @@
         "feature-sets": [
             "lex0",
             "lex2",
-            "llvm0",
             "par0"
         ]
     },
