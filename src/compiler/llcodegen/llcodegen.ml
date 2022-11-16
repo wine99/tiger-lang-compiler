@@ -170,7 +170,7 @@ let build_store t o1 o2 = B.add_insn (None, Ll.Store (t, o1, o2))
 let gep_0 ty op i = Ll.Gep (ty, op, [Const 0; Const i])
 
 let ar_oper =
-  [Oper.PlusOp; Oper.MinusOp; Oper.TimesOp; Oper.DivideOp; Oper.ExponentOp]
+  [Oper.PlusOp; Oper.MinusOp; Oper.TimesOp; Oper.DivideOp]
 
 let cmp_oper =
   [Oper.EqOp; Oper.NeqOp; Oper.LtOp; Oper.LeOp; Oper.GtOp; Oper.GeOp]
@@ -210,11 +210,16 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
         | MinusOp -> Ll.Sub
         | TimesOp -> Ll.Mul
         | DivideOp -> Ll.SDiv
-        | ExponentOp -> raise NotImplemented
         | _ -> raise NotImplemented
       in
       let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
       aiwf "arith_tmp" i
+  | H.OpExp {left; right; oper ;_} when oper = Oper.ExponentOp ->
+    let* op_left = cgE_ left in
+    let* op_right = cgE_ right in
+    let bop = "exponent" in
+    let func = Ll.Gid (S.symbol bop) in
+    aiwf "ret" (Ll.Call (Ll.I64, func, [(Ll.I64, op_left) ; (Ll.I64, op_right)]))   
   | H.OpExp {left; right; oper; _}
     when List.exists (fun x -> x = oper) cmp_oper -> (
       let* op_left = cgE_ left in
