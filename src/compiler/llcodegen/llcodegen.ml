@@ -175,16 +175,16 @@ let cmp_oper =
   [Oper.EqOp; Oper.NeqOp; Oper.LtOp; Oper.LeOp; Oper.GtOp; Oper.GeOp]
 
 let global_functions =
-  [ "print"
-  ; "flush"
-  ; "getChar"
-  ; "ord"
-  ; "chr"
-  ; "size"
-  ; "substring"
-  ; "concat"
-  ; "not"
-  ; "tigerexit" ]
+  [ "print", Ll.Void
+  ; "flush", Ll.Void
+  ; "getChar", ptr_i8
+  ; "ord", Ll.I64
+  ; "chr", ptr_i8
+  ; "size", Ll.I64
+  ; "substring", ptr_i8
+  ; "concat", ptr_i8
+  ; "not", Ll.I64
+  ; "tigerexit", Ll.Void ]
 
 let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
     B.buildlet * Ll.operand (* Alternatively: Ll.operand m *) =
@@ -353,13 +353,22 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
             )
       in
       let* ops = loop args in
-      let is_global = List.exists (( = ) (S.name func)) global_functions in
-      if is_global then
-        let func = Ll.Gid func in
-        aiwf "ret" (Ll.Call (Ll.I64, func, ops))
-      else
-        (* find the right static link using ctxt and lvl_diff *)
-        raise NotImplemented
+      let is_global = List.find_opt (fun x -> let (name, _) = x in name = (S.name func)) global_functions in
+      (match is_global with
+        | None -> raise NotImplemented (* find the right static link using ctxt and lvl_diff *)
+        | Some (_, ret_ty) -> (
+          let func = Ll.Gid func in
+          let locals = ctxt.summary.locals_uid in
+          let locals_type = ctxt.summary.locals_tid in
+          let* cast = aiwf "SL" @@ Ll.Bitcast (Ll.Ptr (Ll.Namedt locals_type) , Ll.Id locals, ptr_i8) in
+          if ret_ty = Ll.Void then (
+            B.add_insn (None, Ll.Call (ret_ty, func, (ptr_i8, cast) ::  ops)), Ll.Null
+          )
+          else (
+            aiwf "ret" (Ll.Call (ret_ty, func, (ptr_i8, cast) ::  ops))
+          )
+        )
+      )
   | H.WhileExp {test; body} ->
       let test_lbl = fresh "test" in
       let body_lbl = fresh "body" in
