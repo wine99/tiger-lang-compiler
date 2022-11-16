@@ -217,23 +217,38 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
       aiwf "arith_tmp" i
   | H.OpExp {left; right; oper; _}
     when List.exists (fun x -> x = oper) cmp_oper -> (
-      (* TODO special case comparison of string *)
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
-      let cnd =
-        match oper with
-        | EqOp -> Ll.Eq
-        | NeqOp -> Ll.Ne
-        | LtOp -> Ll.Slt
-        | LeOp -> Ll.Sle
-        | GtOp -> Ll.Sgt
-        | GeOp -> Ll.Sge
-        | _ -> raise NotImplemented
-      in
-      match left with
-      | H.Exp {ty; _} ->
+      ( (* TODO special case comparison of string *)
+        match left with
+        | H.Exp {ty; _} when ty = Ty.STRING ->
+          let cnd =
+            match oper with
+            | EqOp -> "stringEqual"
+            | NeqOp -> "stringNotEq"
+            | LtOp -> "stringLess"
+            | LeOp -> "stringLessEq"
+            | GtOp -> "stringGreater"
+            | GeOp -> "stringGreaterEq"
+            | _ -> raise NotImplemented
+          in 
+          let func = Ll.Gid (S.symbol cnd) in
+          aiwf "ret" (Ll.Call (Ll.I64, func, [(ptr_i8, op_left) ; (ptr_i8, op_right)]))
+        | H.Exp {ty; _} ->
+          let cnd =
+            match oper with
+            | EqOp -> Ll.Eq
+            | NeqOp -> Ll.Ne
+            | LtOp -> Ll.Slt
+            | LeOp -> Ll.Sle
+            | GtOp -> Ll.Sgt
+            | GeOp -> Ll.Sge
+            | _ -> raise NotImplemented
+          in 
           let* tmp = aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right) in
-          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) )
+          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) 
+        )
+      )
   | H.AssignExp {var; exp} ->
       let* e = cgE_ exp in
       let* dest = cgVar ctxt var in
