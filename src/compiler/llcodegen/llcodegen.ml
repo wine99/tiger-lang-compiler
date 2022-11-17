@@ -107,6 +107,15 @@ let fresh =
   let env = empty in
   gensym env
 
+let cmp_to_ll_cmp = function
+  | H.EqOp -> Ll.Eq
+  | H.NeqOp -> Ll.Ne
+  | H.LtOp -> Ll.Slt
+  | H.LeOp -> Ll.Sle
+  | H.GtOp -> Ll.Sgt
+  | H.GeOp -> Ll.Sge
+  | _ -> raise NotImplemented
+
 let ptr_i8 = Ll.Ptr Ll.I8
 
 let ( <$> ) f g x = f (g x)
@@ -252,16 +261,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
           aiwf "ret"
             (Ll.Call (Ll.I64, func, [(ptr_i8, op_left); (ptr_i8, op_right)]))
       | H.Exp {ty; _} ->
-          let cnd =
-            match oper with
-            | EqOp -> Ll.Eq
-            | NeqOp -> Ll.Ne
-            | LtOp -> Ll.Slt
-            | LeOp -> Ll.Sle
-            | GtOp -> Ll.Sgt
-            | GeOp -> Ll.Sge
-            | _ -> raise NotImplemented
-          in
+          let cnd = cmp_to_ll_cmp oper in
           let* tmp =
             aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
           in
