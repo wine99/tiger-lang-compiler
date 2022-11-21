@@ -87,13 +87,7 @@ let cg_tydecl (uenv : unique_env ref) (H.Tdecl {name; ty; _}) =
   | Ty.STRING -> Some (name, llvm_type) (* type a = string *)
   | Ty.NAME (_, _) -> Some (name, llvm_type) (* type a = b *)
   | Ty.VOID -> Some (name, llvm_type)
-  | Ty.RECORD (_, u) -> (
-    match UniqueMap.find_opt u !uenv with
-    | None ->
-        uenv := UniqueMap.add u name !uenv ;
-        Some (name, llvm_type)
-    | Some _ -> None )
-  | Ty.ARRAY (_, u) -> (
+  | Ty.RECORD (_, u) | Ty.ARRAY (_, u) -> (
     match UniqueMap.find_opt u !uenv with
     | None ->
         uenv := UniqueMap.add u name !uenv ;
@@ -436,15 +430,21 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   | SubscriptVar (v, exp) ->
       let* cg_var = cgVar ctxt v in
       let* cg_exp = cgExp ctxt exp in
-      (*let something = Ll.Gep (llvm_type, cgVar, [cgExp]) in*)
       raise NotImplemented
   | _ -> raise NotImplemented
 
+and llvm_record_type (ctxt : context) : H.var -> Ll.tid = function
+  | H.Var {ty= Ty.RECORD (_, uniq); _} -> UniqueMap.find uniq ctxt.uenv
+  | _ -> raise CodeGenerationBug
+
 and index_of (ctxt : context) sym : H.var -> int = function
-  | var ->
-      let tid = sym_of_var var in
-      let uniq_type = UniqueMap.find ctxt.uenv in
-      raise NotImplemented
+  | H.Var {ty= Ty.RECORD (fields, _); _} -> List.map fst fields |> idx 0 sym
+  | _ -> raise CodeGenerationBug
+
+and idx n el = function
+  | [] -> n
+  | x :: _ when x = el -> n
+  | _ :: xs -> idx (n + 1) el xs
 
 (* Usage: pass locals to parent_ptr *)
 and cgVarLookup ctxt summary (parent_ptr : Ll.operand) sym n =
