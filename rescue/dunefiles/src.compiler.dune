@@ -3,9 +3,9 @@
         (libraries tigermain))
 
 
-(install
+(install 
     (section bin)
-
+    
     (files (tigerc.exe as tigerc)
            ))
 
