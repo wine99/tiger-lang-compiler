@@ -81,6 +81,18 @@ type context =
 
 (* Obs: this is a rather tricky piece of code; 2019-10-12 *)
 let cg_tydecl (uenv : unique_env ref) (H.Tdecl {name; ty; _}) =
+  (* [ty] has a named type arround it, seems like a weird design choice *)
+  let ty =
+    match ty with
+      | Types.NAME (_, ty_ref) -> (
+          match !ty_ref with
+          | Some ty -> ty
+          | None -> raise CodeGenerationBug
+      )
+      | _ -> raise CodeGenerationBug
+  in
+  (* print_string ("\n" ^ (S.name name) ^ "\n") ;
+  Pp_habsyn.pp_ty ~unfold:true ty Format.std_formatter (); *)
   let llvm_type = ty_to_llty ty in
   match ty with
   | Ty.INT -> Some (name, llvm_type) (* type a = int *)
@@ -195,7 +207,7 @@ let global_functions =
   ; ("not", Ll.I64)
   ; ("tigerexit", Ll.Void) ]
 
-let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
+let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
     B.buildlet * Ll.operand (* Alternatively: Ll.operand m *) =
   let cgE_ = cgExp ctxt in
   match exp_base with
@@ -387,9 +399,60 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
     match ctxt.break_lbl with
     | None -> raise NotImplemented (* Should not be allowed *)
     | Some merge_lbl -> (B.term_block @@ Ll.Br merge_lbl, Ll.Null) )
+  | RecordExp {fields= fields_inits} ->
+      let rec cgFieldsInit rec_ptr fields_inits rec_ty fields_tys rec_llty = (
+        match fields_inits with
+        | [] -> aiwf "rec" @@ Ll.Load (rec_llty, rec_ptr)
+        | (field, init) :: fields_inits ->
+            let ty = List.assoc field fields_tys in
+            let llty = mk_actual_llvm_type (field, ty) in
+            let* op_init = cgE_ init in
+            let* field_ptr =
+              aiwf "field_ptr" @@
+                gep_0 rec_llty rec_ptr @@ field_offset field rec_ty in
+            let* _ = (build_store llty op_init field_ptr, Ll.Null) in
+            cgFieldsInit rec_ptr fields_inits rec_ty fields_tys rec_llty
+      ) in
+      let fields_tys = (
+        (* print_string "ffffffffff " ;
+        Pp_habsyn.pp_ty ~unfold:true ty Format.std_formatter (); *)
+        match ty with
+        | Types.NAME (_, ty_ref) -> (
+            match !ty_ref with
+            | Some Types.RECORD (fields_tys, _) -> fields_tys
+            | _ -> raise CodeGenerationBug
+        )
+        | _ -> raise CodeGenerationBug
+      ) in
+      let rec_llty = ty_to_llty ty in
+      let* size_ptr = aiwf "size_ptr" @@
+        Ll.Gep (rec_llty, Ll.Null, [Ll.Const 1]) in
+      let* size = aiwf "size" @@
+        Ll.Ptrtoint (rec_llty, size_ptr, Ll.I64) in
+      let* rec_ptr_i8 = aiwf "rec_ptr_i8" @@
+        Ll.Call (ptr_i8, (Ll.Gid (S.symbol "allocRecord")), [(Ll.I64, size)]) in
+      let* rec_ptr = aiwf "rec_ptr" @@
+        Ll.Bitcast (ptr_i8, rec_ptr_i8, Ll.Ptr rec_llty) in
+      cgFieldsInit rec_ptr fields_inits ty fields_tys rec_llty
+  | ArrayExp {size; init} ->
+      let elem_llty = ty_to_llty (
+        match actual_type ty with
+        | Types.ARRAY (ty, _) -> ty
+        | _ -> raise CodeGenerationBug
+      ) in
+      let* size = cgE_ size in
+      let* init = cgE_ init in
+      let* init = aiwf "array_init" @@ Ll.Bitcast (elem_llty, init, ptr_i8) in
+      let* elem_size_ptr = aiwf "elem_size_ptr" @@
+        Ll.Gep (elem_llty, Ll.Null, [Ll.Const 1]) in
+      let* elem_size = aiwf "elem_size" @@
+        Ll.Ptrtoint (elem_llty, elem_size_ptr, Ll.I64) in
+      aiwf "arr_ptr" @@
+        Ll.Call (ptr_i8, (Ll.Gid (S.symbol "initArray")), [(Ll.I64, size); (Ll.I64, elem_size); (elem_llty, init)])
+  | NilExp ->
+      return Ll.Null
   | _ ->
-      Pp_habsyn.pp_exp exp Format.std_formatter () ;
-      raise NotImplemented
+      raise CodeGenerationBug
 
 and cgIfThenElse ctxt test thn els ty =
   let cgE_ = cgExp ctxt in
@@ -426,45 +489,60 @@ and cgIfThenElse ctxt test thn els ty =
   if res_ty = Ll.Void then return Ll.Null
   else aiwf "if_res" @@ Ll.Load (res_ty, res_ptr)
 
-and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
+and cgVar (ctxt : context) (H.Var {var_base; ty; _}) =
   let llvm_type = ty_to_llty ty in
   match var_base with
   | AccessVar (i, sym) ->
       let locals = Ll.Id ctxt.summary.locals_uid in
       cgVarLookup ctxt ctxt.summary locals sym i
-  | FieldVar (var, sym) -> raise NotImplemented
-  | SubscriptVar (v, exp) ->
-      let* cg_var = cgVar ctxt v in
-      let* cg_exp = cgExp ctxt exp in
-      raise NotImplemented
-  | _ -> raise NotImplemented
+      (* let* var_ptr = cgVarLookup ctxt ctxt.summary locals sym i in
+      aiwf "var" @@ Ll.Load (ty_to_llty ty, var_ptr) *)
+  | FieldVar (var, sym) -> (
+      let* var_ptr = cgVar ctxt var in
+      match var with
+      | H.Var {ty= record_ty; _} ->
+          (* let* field_ptr = *)
+            aiwf "field_ptr" @@
+              gep_0 (ty_to_llty record_ty) var_ptr @@ field_offset sym record_ty
+          (* in
+          aiwf "field" @@
+            Ll.Load (llvm_type, field_ptr) *)
+  )
+  | SubscriptVar (var, exp) ->
+      let* var_ptr = cgVar ctxt var in
+      let* index = cgExp ctxt exp in
+      match var with
+      | H.Var {ty= array_ty; _} ->
+          let array_ty = actual_type array_ty in
+          match array_ty with
+          | Types.ARRAY ((* size, *)_) ->
+              (* let* elem_ptr = *)
+                aiwf "array_elem_ptr" @@
+                  Ll.Gep (ty_to_llty array_ty, var_ptr, [index])
+              (* in
+              aiwf "array_elem" @@
+                Ll.Load (llvm_type, elem_ptr) *)
+          | _ -> raise CodeGenerationBug
 
-(* TODO: Remove if cgParentLookup is succesful / correct
-   and cgParentL (ctxt : context) fdecl_summary i sym =
-     let rec loop oper sumry n =
-       let locals_tpe = Ll.Namedt sumry.locals_tid in
-       match n with
-       | 0 ->
-           let offset = sumry.offset_of_symbol sym in
-           let load_locals_inst = gep_0 locals_tpe oper offset in
-           aiwf (S.name sym ^ "_ptr") load_locals_inst
-       | _ -> (
-           let psym =
-             match sumry.parent_opt with
-             | None -> raise CodeGenerationBug
-             | Some s -> s
-           in
-           let offset = sumry.offset_of_symbol psym in
-           let gep_parent = gep_0 locals_tpe oper offset in
-           let* inst = aiwf (S.name psym ^ "_ptr") gep_parent in
-           let psumry = SymbolMap.find_opt psym ctxt.senv in
-           match psumry with
-           | None -> raise CodeGenerationBug
-           | Some pfs -> loop inst pfs (n - 1) )
-     in
-     let op = Ll.Id fdecl_summary.locals_uid in
-     loop op fdecl_summary i
-*)
+and field_offset field (ty : Types.ty) =
+  match actual_type ty with
+  | Types.RECORD (fields, _) -> assoc_index field fields
+  | _ -> raise CodeGenerationBug
+
+and actual_type = function
+  | Types.NAME (_, opt_ty_ref) -> (
+    match !opt_ty_ref with
+    | None -> raise CodeGenerationBug
+    | Some a -> actual_type a )
+  | t -> t
+
+and assoc_index a l =
+  let rec loop l i =
+    match l with
+    | [] -> raise CodeGenerationBug
+    | (a', _) :: l' -> if a = a' then i else loop l' (i + 1)
+  in
+  loop l 0
 
 (* Usage: pass locals to parent_ptr *)
 and cgVarLookup ctxt summary (parent_ptr : Ll.operand) sym n =
@@ -508,8 +586,8 @@ and cgSlOrVarLookup ctxt summary (parent_ptr : Ll.operand)
 
 and getSlType ctxt summary = function
   | 0 ->
-      print_string "locals_tid: " ;
-      print_string @@ S.name summary.locals_tid ;
+      (* print_string "locals_tid: " ;
+      print_string @@ S.name summary.locals_tid ; *)
       Ll.Namedt summary.locals_tid
   | n ->
       let parent_sym =
@@ -591,10 +669,10 @@ let cg_fdecl senv uenv gdecls (H.Fdecl {name; args; result; body; _}) =
   in
   let copy_one_arg (name, ty) =
     (* A buildlet for copying one argument *)
-    print_string @@ S.name name ;
+    (* print_string @@ S.name name ;
     print_newline () ;
     print_int @@ offset_of_symbol name ;
-    print_newline () ;
+    print_newline () ; *)
     let build_gep, op_gep =
       aiwf "arg"
         (gep_0 (* Use GEP to find where to store the argument *)
