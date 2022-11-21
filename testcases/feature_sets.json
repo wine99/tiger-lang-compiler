@@ -734,8 +734,6 @@
             "lex0",
             "lex1",
             "lex2",
-            "llvm0",
-            "llvm3",
             "par0",
             "par1",
             "par3",
@@ -892,8 +890,6 @@
         "feature-sets": [
             "lex0",
             "lex2",
-            "llvm0",
-            "llvm2",
             "par0",
             "par1",
             "par2"
@@ -917,11 +913,6 @@
             "lex0",
             "lex1",
             "lex2",
-            "llvm0",
-            "llvm1",
-            "llvm2",
-            "llvm3",
-            "llvm4",
             "par0",
             "par1",
             "par2",
@@ -939,8 +930,6 @@
         "feature-sets": [
             "lex0",
             "lex2",
-            "llvm0",
-            "llvm2",
             "par0",
             "par1",
             "par2"
