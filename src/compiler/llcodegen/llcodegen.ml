@@ -336,26 +336,23 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
             name = S.name func )
           global_functions
       in
+      let func = Ll.Gid func in
+      let locals = Ll.Id ctxt.summary.locals_uid in
       match is_global with
       | Some (_, ret_ty) ->
-          let func = Ll.Gid func in
-          let locals = ctxt.summary.locals_uid in
           let locals_type = ctxt.summary.locals_tid in
           let* sl =
             aiwf "SL"
-            @@ Ll.Bitcast
-                 (Ll.Ptr (Ll.Namedt locals_type), Ll.Id locals, ptr_i8)
+            @@ Ll.Bitcast (Ll.Ptr (Ll.Namedt locals_type), locals, ptr_i8)
           in
           if ret_ty = Ll.Void then
             ( B.add_insn (None, Ll.Call (ret_ty, func, (ptr_i8, sl) :: ops))
             , Ll.Null )
           else aiwf "ret" @@ Ll.Call (ret_ty, func, (ptr_i8, sl) :: ops)
       | None ->
-          let locals = Ll.Id ctxt.summary.locals_uid in
           let* sl_ptr = cgSlLookup ctxt ctxt.summary locals lvl_diff in
           let sl_ptr_ty = Ll.Ptr (getSlType ctxt ctxt.summary lvl_diff) in
           let ret_ty = ty_to_llty ty in
-          let func = Ll.Gid func in
           if ret_ty = Ll.Void then
             ( B.add_insn
                 (None, Ll.Call (ret_ty, func, (sl_ptr_ty, sl_ptr) :: ops))
@@ -387,6 +384,9 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
     match ctxt.break_lbl with
     | None -> raise NotImplemented (* Should not be allowed *)
     | Some merge_lbl -> (B.term_block @@ Ll.Br merge_lbl, Ll.Null) )
+  | H.RecordExp {fields} ->
+      let* size_ptr = raise NotImplemented in
+      raise NotImplemented
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
@@ -432,39 +432,22 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   | AccessVar (i, sym) ->
       let locals = Ll.Id ctxt.summary.locals_uid in
       cgVarLookup ctxt ctxt.summary locals sym i
-  | FieldVar (var, sym) -> raise NotImplemented
+  | FieldVar ((H.Var {ty; _} as var), sym) ->
+      let oper = cgVar ctxt var in
+      let offset = index_of ctxt sym var in
+      raise NotImplemented
   | SubscriptVar (v, exp) ->
       let* cg_var = cgVar ctxt v in
       let* cg_exp = cgExp ctxt exp in
+      (*let something = Ll.Gep (llvm_type, cgVar, [cgExp]) in*)
       raise NotImplemented
   | _ -> raise NotImplemented
 
-(* TODO: Remove if cgParentLookup is succesful / correct
-   and cgParentL (ctxt : context) fdecl_summary i sym =
-     let rec loop oper sumry n =
-       let locals_tpe = Ll.Namedt sumry.locals_tid in
-       match n with
-       | 0 ->
-           let offset = sumry.offset_of_symbol sym in
-           let load_locals_inst = gep_0 locals_tpe oper offset in
-           aiwf (S.name sym ^ "_ptr") load_locals_inst
-       | _ -> (
-           let psym =
-             match sumry.parent_opt with
-             | None -> raise CodeGenerationBug
-             | Some s -> s
-           in
-           let offset = sumry.offset_of_symbol psym in
-           let gep_parent = gep_0 locals_tpe oper offset in
-           let* inst = aiwf (S.name psym ^ "_ptr") gep_parent in
-           let psumry = SymbolMap.find_opt psym ctxt.senv in
-           match psumry with
-           | None -> raise CodeGenerationBug
-           | Some pfs -> loop inst pfs (n - 1) )
-     in
-     let op = Ll.Id fdecl_summary.locals_uid in
-     loop op fdecl_summary i
-*)
+and index_of (ctxt : context) sym : H.var -> int = function
+  | var ->
+      let tid = sym_of_var var in
+      let uniq_type = UniqueMap.find ctxt.uenv in
+      raise NotImplemented
 
 (* Usage: pass locals to parent_ptr *)
 and cgVarLookup ctxt summary (parent_ptr : Ll.operand) sym n =
