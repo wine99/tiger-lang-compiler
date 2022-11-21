@@ -384,9 +384,6 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} as exp : H.exp) :
     match ctxt.break_lbl with
     | None -> raise NotImplemented (* Should not be allowed *)
     | Some merge_lbl -> (B.term_block @@ Ll.Br merge_lbl, Ll.Null) )
-  | H.RecordExp {fields} ->
-      let* size_ptr = raise NotImplemented in
-      raise NotImplemented
   | _ ->
       Pp_habsyn.pp_exp exp Format.std_formatter () ;
       raise NotImplemented
