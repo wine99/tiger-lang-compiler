@@ -502,9 +502,19 @@ and cgIfThenElse ctxt test thn els ty =
 
 and cgVar (ctxt : context) (H.Var {var_base; ty; _}) =
   match var_base with
-  | AccessVar (i, sym) ->
+  | AccessVar (i, sym) -> (
       let locals = Ll.Id ctxt.summary.locals_uid in
-      cgVarLookup ctxt ctxt.summary locals sym i
+      let* var_ptr = cgVarLookup ctxt ctxt.summary locals sym i in
+      match actual_type ty with
+      | Ty.ARRAY _ | Ty.RECORD _ ->
+          let bitcast =
+            Ll.Bitcast
+              ( Ll.Ptr (ty_to_llty ty)
+              , var_ptr
+              , Ll.Ptr (Ll.Ptr (ty_to_llty ty)) )
+          in
+          aiwf "var_ptr" bitcast
+      | _ -> return var_ptr )
   | FieldVar (var, sym) ->
       let t = Ll.Ptr (ty_to_llty ty) in
       let* oper = cgVar ctxt var in
