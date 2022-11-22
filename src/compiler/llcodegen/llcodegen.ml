@@ -403,7 +403,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
       let rec cgFieldsInit rec_ptr fields_inits rec_ty fields_tys rec_llty =
         match fields_inits with
         | [] -> aiwf "rec" @@ Ll.Load (rec_llty, rec_ptr)
-        | (field, init) :: fields_inits ->
+        | (field, init) :: fs ->
             let ty = List.assoc field fields_tys in
             let llty = mk_actual_llvm_type (field, ty) in
             let* op_init = cgE_ init in
@@ -412,7 +412,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
               @@ field_offset field rec_ty
             in
             let* _ = (build_store llty op_init field_ptr, Ll.Null) in
-            cgFieldsInit rec_ptr fields_inits rec_ty fields_tys rec_llty
+            cgFieldsInit rec_ptr fs rec_ty fields_tys rec_llty
       in
       let fields_tys =
         (* print_string "ffffffffff " ;
@@ -500,22 +500,12 @@ and cgIfThenElse ctxt test thn els ty =
   if res_ty = Ll.Void then return Ll.Null
   else aiwf "if_res" @@ Ll.Load (res_ty, res_ptr)
 
-and cgVar (ctxt : context) (H.Var {var_base; ty; _}) =
+and cgVar (ctxt : context) (H.Var {var_base; _}) =
   match var_base with
-  | AccessVar (i, sym) -> (
+  | AccessVar (i, sym) ->
       let locals = Ll.Id ctxt.summary.locals_uid in
-      let* var_ptr = cgVarLookup ctxt ctxt.summary locals sym i in
-      match actual_type ty with
-      | Ty.ARRAY _ | Ty.RECORD _ ->
-          let bitcast =
-            Ll.Bitcast
-              ( Ll.Ptr (ty_to_llty ty)
-              , var_ptr
-              , Ll.Ptr (Ll.Ptr (ty_to_llty ty)) )
-          in
-          aiwf "var_ptr" bitcast
-      | _ -> return var_ptr )
-  | FieldVar (var, sym) ->
+      cgVarLookup ctxt ctxt.summary locals sym i
+  | FieldVar ((H.Var {ty; _} as var), sym) ->
       let t = Ll.Ptr (ty_to_llty ty) in
       let* oper = cgVar ctxt var in
       let offset = index_of ctxt sym var in
