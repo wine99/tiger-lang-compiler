@@ -501,13 +501,12 @@ and cgIfThenElse ctxt test thn els ty =
   else aiwf "if_res" @@ Ll.Load (res_ty, res_ptr)
 
 and cgVar (ctxt : context) (H.Var {var_base; ty; _}) =
-  let llvm_type = ty_to_llty ty in
   match var_base with
   | AccessVar (i, sym) ->
       let locals = Ll.Id ctxt.summary.locals_uid in
       cgVarLookup ctxt ctxt.summary locals sym i
   | FieldVar (var, sym) ->
-      let t = Ll.Ptr (Ll.Namedt sym) in
+      let t = Ll.Ptr (ty_to_llty ty) in
       let* oper = cgVar ctxt var in
       let offset = index_of ctxt sym var in
       let gep_istr = gep_0 t oper offset in
