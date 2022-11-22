@@ -442,13 +442,15 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
       ) in
       let* size = cgE_ size in
       let* init = cgE_ init in
-      let* init = aiwf "array_init" @@ Ll.Bitcast (elem_llty, init, ptr_i8) in
+      let* init_ptr = aiwf "arr_init_ptr" @@ Ll.Alloca elem_llty in
+      let* _ = (build_store elem_llty init init_ptr, Ll.Null) in
+      let* init_ptr = aiwf "array_init" @@ Ll.Bitcast (Ptr elem_llty, init_ptr, ptr_i8) in
       let* elem_size_ptr = aiwf "elem_size_ptr" @@
         Ll.Gep (elem_llty, Ll.Null, [Ll.Const 1]) in
       let* elem_size = aiwf "elem_size" @@
         Ll.Ptrtoint (elem_llty, elem_size_ptr, Ll.I64) in
       aiwf "arr_ptr" @@
-        Ll.Call (ptr_i8, (Ll.Gid (S.symbol "initArray")), [(Ll.I64, size); (Ll.I64, elem_size); (elem_llty, init)])
+        Ll.Call (ptr_i8, (Ll.Gid (S.symbol "initArray")), [(Ll.I64, size); (Ll.I64, elem_size); (ptr_i8, init_ptr)])
   | NilExp ->
       return Ll.Null
   | _ ->
@@ -513,12 +515,16 @@ and cgVar (ctxt : context) (H.Var {var_base; ty; _}) =
       let* index = cgExp ctxt exp in
       match var with
       | H.Var {ty= array_ty; _} ->
-          let array_ty = actual_type array_ty in
-          match array_ty with
-          | Types.ARRAY ((* size, *)_) ->
+          let array_llty = ty_to_llty array_ty in
+          match actual_type array_ty with
+          | Types.ARRAY (ty, _) ->
               (* let* elem_ptr = *)
+                let* array_elem_ptr =
+                  aiwf "array_elem_ptr" @@
+                    Ll.Gep (array_llty, var_ptr, [index])
+                in
                 aiwf "array_elem_ptr" @@
-                  Ll.Gep (ty_to_llty array_ty, var_ptr, [index])
+                  Ll.Bitcast (Ptr ptr_i8, array_elem_ptr, Ptr (ty_to_llty ty))
               (* in
               aiwf "array_elem" @@
                 Ll.Load (llvm_type, elem_ptr) *)
