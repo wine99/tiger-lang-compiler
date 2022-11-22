@@ -506,8 +506,6 @@ and cgVar (ctxt : context) (H.Var {var_base; ty; _}) =
   | AccessVar (i, sym) ->
       let locals = Ll.Id ctxt.summary.locals_uid in
       cgVarLookup ctxt ctxt.summary locals sym i
-      (* let* var_ptr = cgVarLookup ctxt ctxt.summary locals sym i in
-         aiwf "var" @@ Ll.Load (ty_to_llty ty, var_ptr) *)
   | FieldVar (var, sym) ->
       let t = Ll.Ptr (Ll.Namedt sym) in
       let* oper = cgVar ctxt var in
