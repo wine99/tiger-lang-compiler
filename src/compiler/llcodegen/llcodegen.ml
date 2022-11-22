@@ -9,7 +9,6 @@ module H = Habsyn
 module Ty = Types
 module S = Symbol
 module B = Cfgbuilder
-open Pp_habsyn
 
 module SymbolMap = Map.Make (struct
   type t = S.symbol
@@ -55,22 +54,24 @@ let string_literal_llstr str =
   let len = String.length str in
   Ll.GStruct [(Ll.I64, Ll.GInt len); (Ll.Array (len, Ll.I8), Ll.GString str)]
 
-let rec ty_to_llty = function
+let rec actual_type = function
+  | Types.NAME (_, opt_ty_ref) -> (
+    match !opt_ty_ref with
+    | None -> raise CodeGenerationBug
+    | Some a -> actual_type a )
+  | t -> t
+
+let rec ty_to_llty ty =
+  match ty with
   | Ty.INT -> Ll.I64
   | Ty.NIL -> Ll.Ptr I8
-  | Ty.STRING -> Ll.Ptr I8
-  | Ty.RECORD (ts, _) -> Ll.Struct (List.map mk_actual_llvm_type ts)
-  | Ty.ARRAY _ -> Ll.Ptr I8
-  | Ty.NAME (sym, _) -> Ll.Namedt sym
+  | Ty.STRING | Ty.RECORD _ | Ty.ARRAY _ -> Ll.Ptr I8
+  (* The given code for generating types of locals (SL) used ty_to_llty,
+     if type a = {...} type b = a, and we have a var v of type b, v should
+     also be a pointer in locals *)
+  | Ty.NAME _ -> ty_to_llty @@ actual_type ty
   | Ty.VOID -> Ll.Void
   | Ty.ERROR -> raise CodeGenerationBug
-
-(** Returns the llvm type corresponding to the given type except for arrays
-    and records which will be mappen to i8 pointers *)
-and mk_actual_llvm_type = function
-  | _, Ty.RECORD _ -> Ll.Ptr I8
-  | _, Ty.ARRAY _ -> Ll.Ptr I8
-  | _, t -> ty_to_llty t
 
 type context =
   { break_lbl: Ll.lbl option
@@ -79,24 +80,29 @@ type context =
   ; senv: summary_env
   ; gdecls: (Ll.gid * Ll.gdecl) list ref }
 
+let get_rec_or_arr_back (uenv : unique_env) ty =
+  match actual_type ty with
+  | Ty.RECORD (_, u) -> Ll.Namedt (UniqueMap.find u uenv)
+  | Ty.ARRAY (_, u) -> Ll.Namedt (UniqueMap.find u uenv)
+  | _ -> raise CodeGenerationBug
+
 (* Obs: this is a rather tricky piece of code; 2019-10-12 *)
 let cg_tydecl (uenv : unique_env ref) (H.Tdecl {name; ty; _}) =
   (* [ty] has a named type arround it, seems like a weird design choice *)
-  let ty =
-    match ty with
-    | Types.NAME (_, ty_ref) -> (
-      match !ty_ref with Some ty -> ty | None -> raise CodeGenerationBug )
-    | _ -> raise CodeGenerationBug
-  in
-  (* print_string ("\n" ^ (S.name name) ^ "\n") ;
-     Pp_habsyn.pp_ty ~unfold:true ty Format.std_formatter (); *)
+  let ty = actual_type ty in
   let llvm_type = ty_to_llty ty in
   match ty with
   | Ty.INT -> Some (name, llvm_type) (* type a = int *)
   | Ty.STRING -> Some (name, llvm_type) (* type a = string *)
   | Ty.NAME (_, _) -> Some (name, llvm_type) (* type a = b *)
   | Ty.VOID -> Some (name, llvm_type)
-  | Ty.RECORD (_, u) | Ty.ARRAY (_, u) -> (
+  | Ty.RECORD (ts, u) -> (
+    match UniqueMap.find_opt u !uenv with
+    | None ->
+        uenv := UniqueMap.add u name !uenv ;
+        Some (name, Ll.Struct (List.map (fun (_, t) -> ty_to_llty t) ts))
+    | Some _ -> None )
+  | Ty.ARRAY (_, u) -> (
     match UniqueMap.find_opt u !uenv with
     | None ->
         uenv := UniqueMap.add u name !uenv ;
@@ -117,18 +123,7 @@ let cmp_to_ll_cmp = function
   | H.LeOp -> Ll.Sle
   | H.GtOp -> Ll.Sgt
   | H.GeOp -> Ll.Sge
-  | _ -> raise CodeGenerationBug
-
-let ll_cmp_string = function
-  | H.EqOp -> "stringEqual"
-  | H.NeqOp -> "stringNotEq"
-  | H.LtOp -> "stringLess"
-  | H.LeOp -> "stringLessEq"
-  | H.GtOp -> "stringGreater"
-  | H.GeOp -> "stringGreaterEq"
-  | _ -> raise CodeGenerationBug
-
-let is_record : Ty.ty -> bool = function Ty.RECORD _ -> true | _ -> false
+  | _ -> raise NotImplemented
 
 let ptr_i8 = Ll.Ptr Ll.I8
 
@@ -243,7 +238,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
         | MinusOp -> Ll.Sub
         | TimesOp -> Ll.Mul
         | DivideOp -> Ll.SDiv
-        | _ -> raise CodeGenerationBug
+        | _ -> raise NotImplemented
       in
       let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
       aiwf "arith_tmp" i
@@ -256,69 +251,34 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
         (Ll.Call (Ll.I64, func, [(Ll.I64, op_left); (Ll.I64, op_right)]))
   | H.OpExp {left; right; oper; _} when List.exists (( = ) oper) cmp_oper
     -> (
-      let (H.Exp {ty= left_ty; _}) = left in
-      let (H.Exp {ty= right_ty; _}) = right in
-      match actual_type left_ty with
-      | Ty.STRING ->
-          let* op_left = cgE_ left in
-          let* op_right = cgE_ right in
-          let cnd = ll_cmp_string oper in
+      let* op_left = cgE_ left in
+      let* op_right = cgE_ right in
+      match left with
+      | H.Exp {ty; _} when ty = Ty.STRING ->
+          let cnd =
+            match oper with
+            | EqOp -> "stringEqual"
+            | NeqOp -> "stringNotEq"
+            | LtOp -> "stringLess"
+            | LeOp -> "stringLessEq"
+            | GtOp -> "stringGreater"
+            | GeOp -> "stringGreaterEq"
+            | _ -> raise NotImplemented
+          in
           let func = Ll.Gid (S.symbol cnd) in
           aiwf "ret"
             (Ll.Call (Ll.I64, func, [(ptr_i8, op_left); (ptr_i8, op_right)]))
-      | Ty.INT ->
-          let* op_left = cgE_ left in
-          let* op_right = cgE_ right in
+      | H.Exp {ty; _} ->
           let cnd = cmp_to_ll_cmp oper in
           let* tmp =
             aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
           in
-          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-      | Ty.RECORD _ when is_record @@ actual_type right_ty -> (
-          (* We check in earlier stages that they are of the same type and only allowed cnd. *)
-          let cmp_vars left_var right_var =
-            let cnd = cmp_to_ll_cmp oper in
-            let* left_ptr = cgVar ctxt left_var in
-            let* right_ptr = cgVar ctxt right_var in
-            let* tmp =
-              aiwf "cmp_tmp"
-              @@ Ll.Icmp
-                   (cnd, Ll.Ptr (ty_to_llty left_ty), left_ptr, right_ptr)
-            in
-            aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-          in
-          let rec get_var exp =
-            let (H.Exp {exp_base= base; _}) = exp in
-            match base with
-            | H.VarExp var -> (B.id_buildlet, Some var)
-            | H.SeqExp exps ->
-                let rec run_ls = function
-                  | [] -> (B.id_buildlet, None)
-                  | [e] -> get_var e
-                  | e :: es ->
-                      let* _ = cgE_ e in
-                      run_ls es
-                in
-                run_ls exps
-            | _ -> (B.id_buildlet, None)
-          in
-          let* left_var = get_var left in
-          let* right_var = get_var right in
-          match (left_var, right_var) with
-          | Some left_var, Some right_var -> cmp_vars left_var right_var
-          | _ -> return (Ll.Const 0) )
-      | Ty.ARRAY _ -> raise NotImplemented
-      | _ -> raise NotImplemented )
+          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) )
   | H.AssignExp {var; exp} ->
       let ty = ty_of_var var in
       let* e = cgE_ exp in
-      let* dest = cgVar ctxt var in
-      if ty_of_exp exp = Ty.NIL then
-        let* dest =
-          aiwf "tmp" @@ Ll.Bitcast (Ptr (ty_to_llty ty), dest, Ptr ptr_i8)
-        in
-        (B.add_insn (None, Ll.Store (ptr_i8, e, dest)), Ll.Null)
-      else (B.add_insn (None, Ll.Store (ty_to_llty ty, e, dest)), Ll.Null)
+      let* dest = cgVar ~load:false ctxt var in
+      (B.add_insn (None, Ll.Store (ty_to_llty ty, e, dest)), Ll.Null)
   | H.LetExp {vardecl; body} -> (
     match vardecl with
     | VarDec {name; typ; init; _} ->
@@ -327,16 +287,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
           cgVarLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid) name
             0
         in
-        let* _ =
-          if ty_of_exp init = Ty.NIL then
-            let* dest =
-              aiwf "tmp"
-              @@ Ll.Bitcast (Ptr (ty_to_llty typ), dest, Ptr ptr_i8)
-            in
-            (B.add_insn (None, Ll.Store (ptr_i8, e, dest)), Ll.Null)
-          else
-            (B.add_insn (None, Ll.Store (ty_to_llty typ, e, dest)), Ll.Null)
-        in
+        let* _ = (build_store (ty_to_llty typ) e dest, Ll.Null) in
         cgE_ body )
   | H.SeqExp exps ->
       let rec loop exps =
@@ -348,11 +299,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
             loop es
       in
       loop exps
-  | H.VarExp (H.Var {ty; _} as var) ->
-      let* var_ptr = cgVar ctxt var in
-      (* TODO: save the ptr in a register to use in cmp *)
-      let load = Ll.Load (ty_to_llty ty, var_ptr) in
-      aiwf "var_tmp" load
+  | H.VarExp var -> cgVar ctxt var
   | H.IfExp {test; thn; els= Some els} -> cgIfThenElse ctxt test thn els ty
   | H.IfExp {test; thn; els= None} ->
       let thn_lbl = fresh "then" in
@@ -441,31 +388,28 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
     | None -> raise NotImplemented (* Should not be allowed *)
     | Some merge_lbl -> (B.term_block @@ Ll.Br merge_lbl, Ll.Null) )
   | RecordExp {fields= fields_inits} ->
-      let rec cgFieldsInit rec_ptr fields_inits rec_ty fields_tys rec_llty =
+      let rec cgFieldsInit rec_ptr rec_ptr_i8 fields_inits rec_ty fields_tys
+          rec_llty =
         match fields_inits with
-        | [] -> aiwf "rec" @@ Ll.Load (rec_llty, rec_ptr)
-        | (field, init) :: fs ->
+        | [] -> return rec_ptr_i8
+        | (field, init) :: fields_inits ->
             let ty = List.assoc field fields_tys in
-            let llty = mk_actual_llvm_type (field, ty) in
+            let llty = ty_to_llty ty in
             let* op_init = cgE_ init in
             let* field_ptr =
               aiwf "field_ptr" @@ gep_0 rec_llty rec_ptr
               @@ field_offset field rec_ty
             in
             let* _ = (build_store llty op_init field_ptr, Ll.Null) in
-            cgFieldsInit rec_ptr fs rec_ty fields_tys rec_llty
+            cgFieldsInit rec_ptr rec_ptr_i8 fields_inits rec_ty fields_tys
+              rec_llty
       in
       let fields_tys =
-        (* print_string "ffffffffff " ;
-           Pp_habsyn.pp_ty ~unfold:true ty Format.std_formatter (); *)
-        match ty with
-        | Types.NAME (_, ty_ref) -> (
-          match !ty_ref with
-          | Some (Types.RECORD (fields_tys, _)) -> fields_tys
-          | _ -> raise CodeGenerationBug )
+        match actual_type ty with
+        | Types.RECORD (fields_tys, _) -> fields_tys
         | _ -> raise CodeGenerationBug
       in
-      let rec_llty = ty_to_llty ty in
+      let rec_llty = get_rec_or_arr_back ctxt.uenv ty in
       let* size_ptr =
         aiwf "size_ptr" @@ Ll.Gep (rec_llty, Ll.Null, [Ll.Const 1])
       in
@@ -477,7 +421,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
       let* rec_ptr =
         aiwf "rec_ptr" @@ Ll.Bitcast (ptr_i8, rec_ptr_i8, Ll.Ptr rec_llty)
       in
-      cgFieldsInit rec_ptr fields_inits ty fields_tys rec_llty
+      cgFieldsInit rec_ptr rec_ptr_i8 fields_inits ty fields_tys rec_llty
   | ArrayExp {size; init} ->
       let elem_llty =
         ty_to_llty
@@ -541,63 +485,45 @@ and cgIfThenElse ctxt test thn els ty =
   if res_ty = Ll.Void then return Ll.Null
   else aiwf "if_res" @@ Ll.Load (res_ty, res_ptr)
 
-and cgVar (ctxt : context) (H.Var {var_base; _}) =
+and cgVar ?(load = true) (ctxt : context) (H.Var {var_base; ty; _}) =
+  let return_llty = ty_to_llty ty in
   match var_base with
   | AccessVar (i, sym) ->
       let locals = Ll.Id ctxt.summary.locals_uid in
-      cgVarLookup ctxt ctxt.summary locals sym i
-  | FieldVar ((H.Var {ty; _} as var), sym) ->
-      let t = ty_to_llty ty in
-      let* oper = cgVar ctxt var in
-      let offset = index_of ctxt sym var in
-      let gep_istr = gep_0 t oper offset in
-      aiwf (S.name sym ^ "_ptr") gep_istr
-  | SubscriptVar (var, exp) -> (
-      let* var_ptr = cgVar ctxt var in
+      let* var_ptr = cgVarLookup ctxt ctxt.summary locals sym i in
+      if load then aiwf "var" @@ Ll.Load (ty_to_llty ty, var_ptr)
+      else return var_ptr
+  | FieldVar (var, sym) ->
+      let rec_ty = ty_of_var var in
+      let rec_llty = get_rec_or_arr_back ctxt.uenv @@ rec_ty in
+      let* rec_ptr = cgVar ctxt var in
+      let* rec_ptr =
+        aiwf "rec_ptr" @@ Bitcast (ptr_i8, rec_ptr, Ptr rec_llty)
+      in
+      let* field_ptr =
+        aiwf "field_ptr" @@ gep_0 rec_llty rec_ptr @@ field_offset sym rec_ty
+      in
+      if load then aiwf "field" @@ Ll.Load (return_llty, field_ptr)
+      else return field_ptr
+  | SubscriptVar (var, exp) ->
+      let arr_ty = actual_type @@ ty_of_var var in
+      let arr_llty = get_rec_or_arr_back ctxt.uenv @@ arr_ty in
+      let* arr_ptr = cgVar ctxt var in
       let* index = cgExp ctxt exp in
-      match var with
-      | H.Var {ty= array_ty; _} -> (
-          let array_llty = ty_to_llty array_ty in
-          match actual_type array_ty with
-          | Types.ARRAY (ty, _) ->
-              (* let* elem_ptr = *)
-              let* array_elem_ptr =
-                aiwf "array_elem_ptr" @@ Ll.Gep (array_llty, var_ptr, [index])
-              in
-              aiwf "array_elem_ptr"
-              @@ Ll.Bitcast (Ptr ptr_i8, array_elem_ptr, Ptr (ty_to_llty ty))
-              (* in
-                 aiwf "array_elem" @@
-                   Ll.Load (llvm_type, elem_ptr) *)
-          | _ -> raise CodeGenerationBug ) )
-
-and llvm_record_type (ctxt : context) : H.var -> Ll.tid = function
-  | H.Var {ty= Ty.RECORD (_, uniq); _} -> UniqueMap.find uniq ctxt.uenv
-  | _ -> raise CodeGenerationBug
-
-and index_of (ctxt : context) sym : H.var -> int = function
-  | H.Var {ty= Ty.NAME (_, tyref); _} -> (
-    match !tyref with
-    | Some (Ty.RECORD (fields, _)) -> List.map fst fields |> idx 0 sym
-    | _ -> raise CodeGenerationBug )
-  | _ -> raise CodeGenerationBug
-
-and idx n el = function
-  | [] -> n
-  | x :: _ when x = el -> n
-  | _ :: xs -> idx (n + 1) el xs
+      let* arr_ptr =
+        aiwf "arr_ptr" @@ Bitcast (ptr_i8, arr_ptr, Ptr arr_llty)
+      in
+      let* elem_ptr = aiwf "elem_ptr" @@ Gep (arr_llty, arr_ptr, [index]) in
+      let* elem_ptr =
+        aiwf "elem_ptr" @@ Bitcast (Ptr ptr_i8, elem_ptr, Ptr return_llty)
+      in
+      if load then aiwf "elem" @@ Ll.Load (return_llty, elem_ptr)
+      else return elem_ptr
 
 and field_offset field (ty : Types.ty) =
   match actual_type ty with
   | Types.RECORD (fields, _) -> assoc_index field fields
   | _ -> raise CodeGenerationBug
-
-and actual_type = function
-  | Types.NAME (_, opt_ty_ref) -> (
-    match !opt_ty_ref with
-    | None -> raise CodeGenerationBug
-    | Some a -> actual_type a )
-  | t -> t
 
 and assoc_index a l =
   let rec loop l i =
@@ -648,10 +574,7 @@ and cgSlOrVarLookup ctxt summary (parent_ptr : Ll.operand)
       cgSlOrVarLookup ctxt parent_summary parent_parent_ptr sym (n - 1)
 
 and getSlType ctxt summary = function
-  | 0 ->
-      (* print_string "locals_tid: " ;
-         print_string @@ S.name summary.locals_tid ; *)
-      Ll.Namedt summary.locals_tid
+  | 0 -> Ll.Namedt summary.locals_tid
   | n ->
       let parent_sym =
         match summary.parent_opt with
@@ -661,22 +584,6 @@ and getSlType ctxt summary = function
       let parent_summary = SymbolMap.find parent_sym ctxt.senv in
       getSlType ctxt parent_summary (n - 1)
 
-(*
-and unwrap_seq (build : a' m) (ctxt : context) (e : H.exp) :
-    'a m * H.var option =
-  let rec loop exps =
-    match exps with
-    | [] -> return Ll.Null
-    | [e] -> unwrap_seq ctxt e
-    | e :: es ->
-        let* _ = cgExp ctxt e in
-        loop es
-  in
-  match e with
-  | H.Exp {exp_base= H.VarExp var; _} -> Some var
-  | H.Exp {exp_base= H.SeqExp exps; _} -> Some (loop exps)
-  | _ -> None
-*)
 (* --- From this point on the code requires no changes --- *)
 
 (* Creates summary of a function declaration; relies on the alpha conversion *)
@@ -748,10 +655,6 @@ let cg_fdecl senv uenv gdecls (H.Fdecl {name; args; result; body; _}) =
   in
   let copy_one_arg (name, ty) =
     (* A buildlet for copying one argument *)
-    (* print_string @@ S.name name ;
-       print_newline () ;
-       print_int @@ offset_of_symbol name ;
-       print_newline () ; *)
     let build_gep, op_gep =
       aiwf "arg"
         (gep_0 (* Use GEP to find where to store the argument *)

@@ -1,0 +1,10 @@
+let 
+
+	type rectype = {name:string, id:int}
+	var b:rectype := rectype {name= "a", id=0}
+
+in
+
+	b.id
+
+end

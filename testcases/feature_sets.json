@@ -578,6 +578,21 @@
         ]
     },
     {
+        "file": "pos/batch/test_field.tig",
+        "feature-sets": [
+            "lex0",
+            "lex2",
+            "llvm0",
+            "llvm1",
+            "llvm2",
+            "llvm3",
+            "llvm4",
+            "par0",
+            "par1",
+            "par2"
+        ]
+    },
+    {
         "file": "pos/batch/biggest_int.tig",
         "feature-sets": [
             "lex0",
