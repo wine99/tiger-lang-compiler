@@ -423,9 +423,8 @@ and cgVar (ctxt : context) (H.Var {var_base; pos; ty}) =
   | AccessVar (i, sym) ->
       let locals = Ll.Id ctxt.summary.locals_uid in
       cgVarLookup ctxt ctxt.summary locals sym i
-  | FieldVar ((H.Var {ty; _} as var), sym) ->
-      let t = ty_to_llty ty in
-      (* TODO: Bitcast this pointer type? *)
+  | FieldVar (var, sym) ->
+      let t = Ll.Ptr (Ll.Namedt sym) in
       let* oper = cgVar ctxt var in
       let offset = index_of ctxt sym var in
       let gep_istr = gep_0 t oper offset in
