@@ -279,11 +279,14 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
           in
           aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) )
   | H.AssignExp {var; exp} ->
+      let ty = ty_of_var var in
       let* e = cgE_ exp in
       let* dest = cgVar ctxt var in
-      let t = ty_to_llty @@ ty_of_exp exp in
-      let store = Ll.Store (t, e, dest) in
-      (B.add_insn (None, store), Ll.Null)
+      if ty_of_exp exp = Ty.NIL then
+        let* dest = aiwf "tmp" @@ Ll.Bitcast (Ptr (ty_to_llty ty), dest, Ptr ptr_i8) in
+        (B.add_insn (None, Ll.Store (ptr_i8, e, dest)), Ll.Null)
+      else
+        (B.add_insn (None, Ll.Store (ty_to_llty ty, e, dest)), Ll.Null)
   | H.LetExp {vardecl; body} -> (
     match vardecl with
     | VarDec {name; typ; init; _} ->
@@ -292,8 +295,13 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
           cgVarLookup ctxt ctxt.summary (Ll.Id ctxt.summary.locals_uid) name
             0
         in
-        let store = Ll.Store (ty_to_llty typ, e, dest) in
-        let* _ = (B.add_insn (None, store), Ll.Null) in
+        let* _ =
+          if ty_of_exp init = Ty.NIL then
+            let* dest = aiwf "tmp" @@ Ll.Bitcast (Ptr (ty_to_llty typ), dest, Ptr ptr_i8) in
+            (B.add_insn (None, Ll.Store (ptr_i8, e, dest)), Ll.Null)
+          else
+            (B.add_insn (None, Ll.Store (ty_to_llty typ, e, dest)), Ll.Null)
+        in
         cgE_ body )
   | H.SeqExp exps ->
       let rec loop exps =
