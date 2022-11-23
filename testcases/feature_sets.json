@@ -796,13 +796,20 @@
         "file": "pos/batch/if_readonly.tig",
         "feature-sets": [
             "llvm0",
-            "llvm1"
+            "llvm1",
+            "llvm3",
+            "par0",
+            "sem0",
+            "sem3",
+            "xasm1",
+            "xasm2"
         ]
     },
     {
         "file": "pos/batch/int_cmp.tig",
         "feature-sets": [
-
+            "llvm0",
+            "llvm1"
         ]
     },
     {
