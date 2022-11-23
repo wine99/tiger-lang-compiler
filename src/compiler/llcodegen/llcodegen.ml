@@ -241,7 +241,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
         | MinusOp -> Ll.Sub
         | TimesOp -> Ll.Mul
         | DivideOp -> Ll.SDiv
-        | _ -> raise NotImplemented
+        | _ -> raise CodeGenerationBug
       in
       let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
       aiwf "arith_tmp" i
@@ -257,18 +257,25 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
       let (H.Exp {ty= left_ty; _}) = left in
-      match actual_type left_ty with
-      | Ty.STRING ->
+      let (H.Exp {ty= right_ty; _}) = right in
+      match (actual_type left_ty, actual_type right_ty) with
+      | Ty.STRING, Ty.STRING ->
           let cnd = ll_cmp_string oper in
           let func = Ll.Gid (S.symbol cnd) in
           aiwf "ret"
             (Ll.Call (Ll.I64, func, [(ptr_i8, op_left); (ptr_i8, op_right)]))
-      | Ty.INT ->
+      | Ty.INT, Ty.INT ->
           let cnd = cmp_to_ll_cmp oper in
           let* tmp =
             aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
           in
           aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
+      | Ty.RECORD (_, uid_left), Ty.RECORD (_, uid_right) ->
+          if (uid_left = uid_right) then raise NotImplemented
+          else raise NotImplemented
+      | Ty.ARRAY (_, uid_left), Ty.ARRAY (_, uid_right) ->
+        if (uid_left = uid_right) then raise NotImplemented
+        else raise NotImplemented
       | _ -> raise NotImplemented )
   | H.AssignExp {var; exp} ->
       let ty = ty_of_var var in
