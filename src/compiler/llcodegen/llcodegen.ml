@@ -256,19 +256,20 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
     -> (
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
-      (* TODO special case comparison of string *)
-      match left with
-      | H.Exp {ty; _} when ty = Ty.STRING ->
+      let (H.Exp {ty= left_ty; _}) = left in
+      match actual_type left_ty with
+      | Ty.STRING ->
           let cnd = ll_cmp_string oper in
           let func = Ll.Gid (S.symbol cnd) in
           aiwf "ret"
             (Ll.Call (Ll.I64, func, [(ptr_i8, op_left); (ptr_i8, op_right)]))
-      | H.Exp {ty; _} ->
+      | Ty.INT ->
           let cnd = cmp_to_ll_cmp oper in
           let* tmp =
             aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
           in
-          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) )
+          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
+      | _ -> raise NotImplemented )
   | H.AssignExp {var; exp} ->
       let ty = ty_of_var var in
       let* e = cgE_ exp in
