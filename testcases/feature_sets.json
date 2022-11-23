@@ -578,6 +578,48 @@
         ]
     },
     {
+        "file": "pos/batch/return_record_var.tig",
+        "feature-sets": [
+            "lex0",
+            "lex2",
+            "llvm0",
+            "llvm1",
+            "llvm2",
+            "llvm4",
+            "par0",
+            "par1",
+            "par2"
+        ]
+    },
+    {
+        "file": "pos/batch/return_record.tig",
+        "feature-sets": [
+            "lex0",
+            "lex2",
+            "llvm0",
+            "llvm1",
+            "llvm2",
+            "llvm4",
+            "par0",
+            "par1",
+            "par2"
+        ]
+    },
+    {
+        "file": "pos/batch/test_array_write.tig",
+        "feature-sets": [
+            "lex0",
+            "lex2",
+            "llvm0",
+            "llvm1",
+            "llvm2",
+            "llvm4",
+            "par0",
+            "par1",
+            "par2"
+        ]
+    },
+    {
         "file": "pos/batch/test_field.tig",
         "feature-sets": [
             "lex0",
@@ -585,7 +627,6 @@
             "llvm0",
             "llvm1",
             "llvm2",
-            "llvm3",
             "llvm4",
             "par0",
             "par1",

@@ -1,0 +1,7 @@
+let
+  type a = {id: int}
+  function f(): a = a{id= 0}
+  var x := f()
+in
+  x.id
+end

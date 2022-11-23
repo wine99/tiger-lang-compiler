@@ -1,0 +1,10 @@
+let
+  type a = {id: int}
+  type b = a
+  function f(): b = a{id= 0}
+  var x := f()
+  function g(): a = x
+  var y := g()
+in
+  y.id
+end
