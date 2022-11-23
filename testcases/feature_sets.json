@@ -795,6 +795,7 @@
     {
         "file": "pos/batch/if_readonly.tig",
         "feature-sets": [
+            "lex0",
             "llvm0",
             "llvm1",
             "llvm3",
