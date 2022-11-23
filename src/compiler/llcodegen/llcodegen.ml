@@ -276,8 +276,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
           aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
       | Ty.RECORD _ when is_record @@ actual_type right_ty ->
           (* We check in earlier stages that they are of the same type and only allowed cnd. *)
-          raise NotImplemented
-          (*match (unwrap_seq ctxt left, right) with
+          (match (left, right) with
             | ( H.Exp {exp_base= H.VarExp left_var; _}
               , H.Exp {exp_base= H.VarExp right_var; _} ) ->
                 let cnd = cmp_to_ll_cmp oper in
@@ -289,7 +288,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
                        (cnd, Ll.Ptr (ty_to_llty left_ty), left_ptr, right_ptr)
                 in
                 aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-            | _ -> return (Ll.Const 0)*)
+            | _ -> return (Ll.Const 0))
       | Ty.ARRAY _ -> raise NotImplemented
       | _ -> raise NotImplemented )
   | H.AssignExp {var; exp} ->
@@ -643,7 +642,7 @@ and getSlType ctxt summary = function
       in
       let parent_summary = SymbolMap.find parent_sym ctxt.senv in
       getSlType ctxt parent_summary (n - 1)
-
+(*
 and unwrap_seq (build : a' m) (ctxt : context) (e : H.exp) :
     'a m * H.var option =
   let rec loop exps =
@@ -658,7 +657,7 @@ and unwrap_seq (build : a' m) (ctxt : context) (e : H.exp) :
   | H.Exp {exp_base= H.VarExp var; _} -> Some var
   | H.Exp {exp_base= H.SeqExp exps; _} -> Some (loop exps)
   | _ -> None
-
+*)
 (* --- From this point on the code requires no changes --- *)
 
 (* Creates summary of a function declaration; relies on the alpha conversion *)
