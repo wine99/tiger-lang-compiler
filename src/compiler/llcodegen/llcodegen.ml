@@ -117,7 +117,16 @@ let cmp_to_ll_cmp = function
   | H.LeOp -> Ll.Sle
   | H.GtOp -> Ll.Sgt
   | H.GeOp -> Ll.Sge
-  | _ -> raise NotImplemented
+  | _ -> raise CodeGenerationBug
+
+let ll_cmp_string = function
+  | H.EqOp -> "stringEqual"
+  | H.NeqOp -> "stringNotEq"
+  | H.LtOp -> "stringLess"
+  | H.LeOp -> "stringLessEq"
+  | H.GtOp -> "stringGreater"
+  | H.GeOp -> "stringGreaterEq"
+  | _ -> raise CodeGenerationBug
 
 let ptr_i8 = Ll.Ptr Ll.I8
 
@@ -250,16 +259,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
       (* TODO special case comparison of string *)
       match left with
       | H.Exp {ty; _} when ty = Ty.STRING ->
-          let cnd =
-            match oper with
-            | EqOp -> "stringEqual"
-            | NeqOp -> "stringNotEq"
-            | LtOp -> "stringLess"
-            | LeOp -> "stringLessEq"
-            | GtOp -> "stringGreater"
-            | GeOp -> "stringGreaterEq"
-            | _ -> raise NotImplemented
-          in
+          let cnd = ll_cmp_string oper in
           let func = Ll.Gid (S.symbol cnd) in
           aiwf "ret"
             (Ll.Call (Ll.I64, func, [(ptr_i8, op_left); (ptr_i8, op_right)]))
