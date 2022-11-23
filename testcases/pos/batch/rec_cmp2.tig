@@ -3,5 +3,5 @@ let
 	var a : rec := rec { name = "a", id = 0 }
     var b : rec := rec { name = "b", id = 1 }
 in
-	(1+2 ; a) <> b
+	(1+2 ; a) = b
 end

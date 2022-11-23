@@ -128,6 +128,23 @@ let ll_cmp_string = function
   | H.GeOp -> "stringGreaterEq"
   | _ -> raise CodeGenerationBug
 
+let unwrap_seq (e : H.exp) =
+  let rec loop exps =
+    match exps with
+    | [] -> (B.id_buildlet, Ll.Null)
+    | [e] -> cgE_ e
+    | e :: es ->
+        let* _ = cgE_ e in
+        loop es
+  in
+  match e with
+  | H.Exp {exp_base= H.VarExp var; _} -> raise NotImplemented
+  | H.Exp {exp_base=H.SeqExp exps; _ } -> Some (loop exps)
+  | _ -> None
+
+let is_record T = function
+| raise NotImplemented
+
 let ptr_i8 = Ll.Ptr Ll.I8
 
 let ( <$> ) f g x = f (g x)
@@ -255,6 +272,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
   | H.OpExp {left; right; oper; _} when List.exists (( = ) oper) cmp_oper
     -> (
       let (H.Exp {ty= left_ty; _}) = left in
+      let (H.Exp {ty= right_ty; _}) = right in
       match actual_type left_ty with
       | Ty.STRING ->
           let* op_left = cgE_ left in
@@ -271,7 +289,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
             aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
           in
           aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-      | Ty.RECORD _ -> (
+      | Ty.RECORD _ -> when is_record right_ty (
         (* We check in earlier stages that they are of the same type and only allowed cnd. *)
         (* TODO: What if right is Nil ??? match on smallest_type function on actual_type of left and right types *)
         match (left, right) with
@@ -285,7 +303,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
               @@ Ll.Icmp (cnd, Ll.Ptr (ty_to_llty left_ty), left_ptr, right_ptr)
             in
             aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-        | _ -> raise NotImplemented (* just return false here somehow *) )
+        | _ -> return (Ll.Const 0))
       | Ty.ARRAY _ -> raise NotImplemented
       | _ -> raise NotImplemented )
   | H.AssignExp {var; exp} ->
