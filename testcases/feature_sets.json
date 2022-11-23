@@ -1060,6 +1060,13 @@
         ]
     },
     {
+        "file": "pos/batch/rec_cmp2.tig",
+        "feature-sets": [
+            "llvm0",
+            "llvm2"
+        ]
+    },
+    {
         "file": "pos/batch/seq_nested_empty.tig",
         "feature-sets": [
             "lex0",
