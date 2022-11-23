@@ -131,7 +131,7 @@ let ll_cmp_string = function
 let unwrap_seq (e : H.exp) =
   let rec loop exps =
     match exps with
-    | [] -> (B.id_buildlet, Ll.Null)
+    | [] -> return Ll.Null
     | [e] -> cgE_ e
     | e :: es ->
         let* _ = cgE_ e in
@@ -142,8 +142,8 @@ let unwrap_seq (e : H.exp) =
   | H.Exp {exp_base=H.SeqExp exps; _ } -> Some (loop exps)
   | _ -> None
 
-let is_record T = function
-| raise NotImplemented
+let is_record: Ty.ty -> bool = function
+| Ty.Record _ -> true
 
 let ptr_i8 = Ll.Ptr Ll.I8
 
@@ -289,7 +289,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
             aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
           in
           aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-      | Ty.RECORD _ -> when is_record right_ty (
+      | Ty.RECORD _ -> when is_record @@ actual_type right_ty (
         (* We check in earlier stages that they are of the same type and only allowed cnd. *)
         (* TODO: What if right is Nil ??? match on smallest_type function on actual_type of left and right types *)
         match (left, right) with
