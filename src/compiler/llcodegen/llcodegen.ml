@@ -315,6 +315,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
       loop exps
   | H.VarExp (H.Var {ty; _} as var) ->
       let* var_ptr = cgVar ctxt var in
+      (* TODO: save the ptr in a register to use in cmp *)
       let load = Ll.Load (ty_to_llty ty, var_ptr) in
       aiwf "var_tmp" load
   | H.IfExp {test; thn; els= Some els} -> cgIfThenElse ctxt test thn els ty
