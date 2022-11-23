@@ -269,9 +269,13 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
             aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
           in
           aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-      | Ty.RECORD _ ->
-          (* We check in earlier stages that they are of the same type. *)
-          raise NotImplemented
+      | Ty.RECORD _ -> (
+        (* We check in earlier stages that they are of the same type. *)
+        match op_left with
+        | Null -> raise NotImplemented
+        | Const _ -> raise NotImplemented
+        | Gid _ -> raise NotImplemented
+        | Id _ -> raise NotImplemented )
       | Ty.ARRAY _ -> raise NotImplemented
       | _ -> raise NotImplemented )
   | H.AssignExp {var; exp} ->
@@ -512,7 +516,7 @@ and cgVar (ctxt : context) (H.Var {var_base; _}) =
       let locals = Ll.Id ctxt.summary.locals_uid in
       cgVarLookup ctxt ctxt.summary locals sym i
   | FieldVar ((H.Var {ty; _} as var), sym) ->
-      let t = Ll.Ptr (ty_to_llty ty) in
+      let t = ty_to_llty ty in
       let* oper = cgVar ctxt var in
       let offset = index_of ctxt sym var in
       let gep_istr = gep_0 t oper offset in
@@ -541,7 +545,10 @@ and llvm_record_type (ctxt : context) : H.var -> Ll.tid = function
   | _ -> raise CodeGenerationBug
 
 and index_of (ctxt : context) sym : H.var -> int = function
-  | H.Var {ty= Ty.RECORD (fields, _); _} -> List.map fst fields |> idx 0 sym
+  | H.Var {ty= Ty.NAME (_, tyref); _} -> (
+    match !tyref with
+    | Some (Ty.RECORD (fields, _)) -> List.map fst fields |> idx 0 sym
+    | _ -> raise CodeGenerationBug )
   | _ -> raise CodeGenerationBug
 
 and idx n el = function
