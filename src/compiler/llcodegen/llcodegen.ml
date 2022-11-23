@@ -274,21 +274,39 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
             aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
           in
           aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-      | Ty.RECORD _ when is_record @@ actual_type right_ty ->
+      | Ty.RECORD _ when is_record @@ actual_type right_ty -> (
           (* We check in earlier stages that they are of the same type and only allowed cnd. *)
-          (match (left, right) with
-            | ( H.Exp {exp_base= H.VarExp left_var; _}
-              , H.Exp {exp_base= H.VarExp right_var; _} ) ->
-                let cnd = cmp_to_ll_cmp oper in
-                let* left_ptr = cgVar ctxt left_var in
-                let* right_ptr = cgVar ctxt right_var in
-                let* tmp =
-                  aiwf "cmp_tmp"
-                  @@ Ll.Icmp
-                       (cnd, Ll.Ptr (ty_to_llty left_ty), left_ptr, right_ptr)
+          let cmp_vars left_var right_var =
+            let cnd = cmp_to_ll_cmp oper in
+            let* left_ptr = cgVar ctxt left_var in
+            let* right_ptr = cgVar ctxt right_var in
+            let* tmp =
+              aiwf "cmp_tmp"
+              @@ Ll.Icmp
+                   (cnd, Ll.Ptr (ty_to_llty left_ty), left_ptr, right_ptr)
+            in
+            aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
+          in
+          let rec get_var exp =
+            let (H.Exp {exp_base= base; _}) = exp in
+            match base with
+            | H.VarExp var -> (B.id_buildlet, Some var)
+            | H.SeqExp exps ->
+                let rec run_ls = function
+                  | [] -> (B.id_buildlet, None)
+                  | [e] -> get_var e
+                  | e :: es ->
+                      let* _ = cgE_ e in
+                      run_ls es
                 in
-                aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
-            | _ -> return (Ll.Const 0))
+                run_ls exps
+            | _ -> (B.id_buildlet, None)
+          in
+          let* left_var = get_var left in
+          let* right_var = get_var right in
+          match (left_var, right_var) with
+          | Some left_var, Some right_var -> cmp_vars left_var right_var
+          | _ -> return (Ll.Const 0) )
       | Ty.ARRAY _ -> raise NotImplemented
       | _ -> raise NotImplemented )
   | H.AssignExp {var; exp} ->
@@ -642,6 +660,7 @@ and getSlType ctxt summary = function
       in
       let parent_summary = SymbolMap.find parent_sym ctxt.senv in
       getSlType ctxt parent_summary (n - 1)
+
 (*
 and unwrap_seq (build : a' m) (ctxt : context) (e : H.exp) :
     'a m * H.var option =
