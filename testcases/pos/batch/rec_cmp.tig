@@ -1,7 +1,7 @@
 let 
 	type rec = { name : string, id : int }
-	var a : rec := { name = "a", id = 0 }
-    var b : rec := { name = "b", id = 1 }
+	var a : rec := rec { name = "a", id = 0 }
+    var b : rec := rec { name = "b", id = 1 }
 in
 	a <> b
 end
