@@ -143,7 +143,8 @@ let unwrap_seq (e : H.exp) =
   | _ -> None
 
 let is_record: Ty.ty -> bool = function
-| Ty.Record _ -> true
+| Ty.RECORD _ -> true
+| _ -> false
 
 let ptr_i8 = Ll.Ptr Ll.I8
 
