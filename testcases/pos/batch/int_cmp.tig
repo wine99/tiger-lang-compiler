@@ -1,0 +1,7 @@
+let 
+	type a = int
+	var x : a := 5
+    var y := 5
+in
+	x <> y
+end
