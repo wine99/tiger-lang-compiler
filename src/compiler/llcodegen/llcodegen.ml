@@ -563,13 +563,19 @@ and mk_var_load_inst ctxt ty var_ptr =
     aiwf "SL" @@ Ll.Bitcast (Ll.Ptr (Ll.Namedt locals_type), locals, ptr_i8)
   in
   let* _ =
-    no_res_inst
-    @@ Ll.Call
-         ( Ll.Void
-         , Ll.Gid (S.symbol "tigerexit")
-         , [(ptr_i8, sl); (Ll.I64, Ll.Const (-1))] )
+    match ty with
+    | Ll.Struct _ ->
+        aiwf "rec_field_error_ret"
+        @@ Ll.Call (Ll.I64, Ll.Gid (S.symbol "recFieldError"), [])
+    | _ ->
+        no_res_inst
+        @@ Ll.Call
+             ( Ll.Void
+             , Ll.Gid (S.symbol "tigerexit")
+             , [(ptr_i8, sl); (Ll.I64, Ll.Const (-1))] )
   in
   let* _ = (B.term_block @@ Ll.Br not_null_lbl, Ll.Null) in
+  (* Not-null branch *)
   let* _ = (B.start_block @@ not_null_lbl, Ll.Null) in
   aiwf "var" @@ Ll.Load (ty, var_ptr)
 
