@@ -187,7 +187,8 @@ let build_store t o1 o2 = B.add_insn (None, Ll.Store (t, o1, o2))
 
 let gep_0 ty op i = Ll.Gep (ty, op, [Const 0; Const i])
 
-let ar_oper = [Oper.PlusOp; Oper.MinusOp; Oper.TimesOp; Oper.DivideOp]
+let arith_oper =
+  [Oper.PlusOp; Oper.MinusOp; Oper.TimesOp; Oper.DivideOp; Oper.ExponentOp]
 
 let cmp_oper =
   [Oper.EqOp; Oper.NeqOp; Oper.LtOp; Oper.LeOp; Oper.GtOp; Oper.GeOp]
@@ -203,6 +204,22 @@ let global_functions =
   ; ("concat", ptr_i8)
   ; ("not", Ll.I64)
   ; ("tigerexit", Ll.Void) ]
+
+let cg_abi op left right =
+  aiwf "arith_tmp" @@ Ll.Binop (op, Ll.I64, left, right)
+
+let cg_arith_binop_instr left right = function
+  | Oper.PlusOp -> cg_abi Ll.Add left right
+  | Oper.MinusOp -> cg_abi Ll.Sub left right
+  | Oper.TimesOp -> cg_abi Ll.Mul left right
+  | Oper.DivideOp -> cg_abi Ll.SDiv left right
+  | Oper.ExponentOp ->
+      aiwf "ret"
+        (Ll.Call
+           ( Ll.I64
+           , Ll.Gid (S.symbol "exponent")
+           , [(Ll.I64, left); (Ll.I64, right)] ) )
+  | _ -> raise CodeGenerationBug
 
 let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
     B.buildlet * Ll.operand (* Alternatively: Ll.operand m *) =
@@ -229,26 +246,11 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
       (* the above can be rewritten using the monadic interface and aux functions
          as follows *)
   *)
-  | H.OpExp {left; right; oper; _} when List.exists (( = ) oper) ar_oper ->
+  | H.OpExp {left; right; oper; _} when List.exists (( = ) oper) arith_oper
+    ->
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
-      let bop =
-        match oper with
-        | PlusOp -> Ll.Add
-        | MinusOp -> Ll.Sub
-        | TimesOp -> Ll.Mul
-        | DivideOp -> Ll.SDiv
-        | _ -> raise CodeGenerationBug
-      in
-      let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
-      aiwf "arith_tmp" i
-  | H.OpExp {left; right; oper; _} when oper = Oper.ExponentOp ->
-      let* op_left = cgE_ left in
-      let* op_right = cgE_ right in
-      let bop = "exponent" in
-      let func = Ll.Gid (S.symbol bop) in
-      aiwf "ret"
-        (Ll.Call (Ll.I64, func, [(Ll.I64, op_left); (Ll.I64, op_right)]))
+      cg_arith_binop_instr op_left op_right oper
   | H.OpExp {left; right; oper; _} when List.exists (( = ) oper) cmp_oper
     -> (
       let* op_left = cgE_ left in
@@ -386,11 +388,10 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
   | H.BreakExp -> (
     match ctxt.break_lbl with
     | None -> raise NotImplemented (* Should not be allowed *)
-    | Some merge_lbl -> (
-      let dummy = fresh "dummy" in
-      let* _ = (B.term_block @@ Ll.Br merge_lbl, Ll.Null) in
-      (B.start_block dummy, Ll.Null)
-      ) )
+    | Some merge_lbl ->
+        let dummy = fresh "dummy" in
+        let* _ = (B.term_block @@ Ll.Br merge_lbl, Ll.Null) in
+        (B.start_block dummy, Ll.Null) )
   | RecordExp {fields= fields_inits} ->
       let rec cgFieldsInit rec_ptr rec_ptr_i8 fields_inits rec_ty fields_tys
           rec_llty =
