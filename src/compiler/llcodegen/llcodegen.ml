@@ -480,8 +480,7 @@ and cgVar ?(load = true) (ctxt : context) (H.Var {var_base; ty; _}) =
   | AccessVar (i, sym) ->
       let locals = Ll.Id ctxt.summary.locals_uid in
       let* var_ptr = cgVarLookup ctxt ctxt.summary locals sym i in
-      if load then aiwf "var" @@ Ll.Load (ty_to_llty ty, var_ptr)
-      else return var_ptr
+      if load then mk_var_load_inst ctxt ty var_ptr else return var_ptr
   | FieldVar (var, sym) ->
       let rec_ty = ty_of_var var in
       let rec_llty = get_rec_or_arr_back ctxt.uenv @@ rec_ty in
@@ -495,6 +494,8 @@ and cgVar ?(load = true) (ctxt : context) (H.Var {var_base; ty; _}) =
       if load then aiwf "field" @@ Ll.Load (return_llty, field_ptr)
       else return field_ptr
   | SubscriptVar (var, exp) ->
+      let inbound_lbl = fresh "inbound_lbl" in
+      let outbound_lbl = fresh "outbound_lbl" in
       let arr_ty = actual_type @@ ty_of_var var in
       let arr_llty = get_rec_or_arr_back ctxt.uenv @@ arr_ty in
       let* arr_ptr = cgVar ctxt var in
@@ -502,6 +503,30 @@ and cgVar ?(load = true) (ctxt : context) (H.Var {var_base; ty; _}) =
       let* arr_ptr =
         aiwf "arr_ptr" @@ Bitcast (ptr_i8, arr_ptr, Ptr arr_llty)
       in
+      let* arr_size_ptr_raw =
+        aiwf "arr_size_ptr_raw" @@ Gep (arr_llty, arr_ptr, [Ll.Const (-1)])
+      in
+      let* arr_size_ptr =
+        aiwf "arr_size_ptr"
+        @@ Ll.Bitcast (Ptr ptr_i8, arr_size_ptr_raw, Ptr Ll.I64)
+      in
+      let* arr_size = aiwf "arr_size" @@ Ll.Load (Ll.I64, arr_size_ptr) in
+      let* cmp =
+        aiwf "bounds_check" @@ Ll.Icmp (Ll.Slt, Ll.I64, index, arr_size)
+      in
+      let* _ =
+        (B.term_block @@ Ll.Cbr (cmp, inbound_lbl, outbound_lbl), Ll.Null)
+      in
+      (* Outbound branch *)
+      let* _ = (B.start_block @@ outbound_lbl, Ll.Null) in
+      let* _ =
+        aiwf "arr_out_bound"
+        @@ Ll.Call
+             (Ll.I64, Ll.Gid (S.symbol "arrInxError"), [(Ll.I64, index)])
+      in
+      let* _ = (B.term_block @@ Ll.Br inbound_lbl, Ll.Null) in
+      (* Inbound branch *)
+      let* _ = (B.start_block @@ inbound_lbl, Ll.Null) in
       let* elem_ptr = aiwf "elem_ptr" @@ Gep (arr_llty, arr_ptr, [index]) in
       let* elem_ptr =
         aiwf "elem_ptr" @@ Bitcast (Ptr ptr_i8, elem_ptr, Ptr return_llty)
@@ -521,6 +546,32 @@ and assoc_index a l =
     | (a', _) :: l' -> if a = a' then i else loop l' (i + 1)
   in
   loop l 0
+
+and mk_var_load_inst ctxt ty var_ptr =
+  let null_lbl = fresh "null_lbl" in
+  let not_null_lbl = fresh "not_null_lbl" in
+  let* cmp =
+    aiwf "var_cmp"
+    @@ Ll.Icmp (Ll.Eq, Ll.Ptr (ty_to_llty ty), Ll.Null, var_ptr)
+  in
+  let* _ = (B.term_block @@ Ll.Cbr (cmp, null_lbl, not_null_lbl), Ll.Null) in
+  (* Null branch *)
+  let* _ = (B.start_block @@ null_lbl, Ll.Null) in
+  let locals = Ll.Id ctxt.summary.locals_uid in
+  let locals_type = ctxt.summary.locals_tid in
+  let* sl =
+    aiwf "SL" @@ Ll.Bitcast (Ll.Ptr (Ll.Namedt locals_type), locals, ptr_i8)
+  in
+  let* _ =
+    no_res_inst
+    @@ Ll.Call
+         ( Ll.Void
+         , Ll.Gid (S.symbol "tigerexit")
+         , [(ptr_i8, sl); (Ll.I64, Ll.Const (-1))] )
+  in
+  let* _ = (B.term_block @@ Ll.Br not_null_lbl, Ll.Null) in
+  let* _ = (B.start_block @@ not_null_lbl, Ll.Null) in
+  aiwf "var" @@ Ll.Load (ty_to_llty ty, var_ptr)
 
 (* Usage: pass locals to parent_ptr *)
 and cgVarLookup ctxt summary (parent_ptr : Ll.operand) sym n =
