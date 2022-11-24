@@ -226,26 +226,6 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
   let cgE_ = cgExp ctxt in
   match exp_base with
   | IntExp i -> (id, Const i)
-  (*| H.OpExp {left; right; oper; _} ->
-      let build_right, op_right = cgE_ right in
-      let build_left, op_left = cgE_ left in
-      let bop =
-        match oper with
-        | PlusOp -> Ll.Add
-        | MinusOp -> Ll.Sub
-        | TimesOp -> Ll.Mul
-        | _ -> raise NotImplemented
-      in
-      let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
-      let newid = fresh "temp" in
-      let builder = Cfgbuilder.add_insn (Some newid, i) in
-      let builder' =
-        Cfgbuilder.seq_buildlets [build_left; build_right; builder]
-      in
-      (builder', Ll.Id newid)
-      (* the above can be rewritten using the monadic interface and aux functions
-         as follows *)
-  *)
   | H.OpExp {left; right; oper; _} when List.exists (( = ) oper) arith_oper
     ->
       let* op_left = cgE_ left in
