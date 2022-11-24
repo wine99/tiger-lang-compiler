@@ -238,7 +238,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
         | MinusOp -> Ll.Sub
         | TimesOp -> Ll.Mul
         | DivideOp -> Ll.SDiv
-        | _ -> raise NotImplemented
+        | _ -> raise CodeGenerationBug
       in
       let i = Ll.Binop (bop, Ll.I64, op_left, op_right) in
       aiwf "arith_tmp" i
