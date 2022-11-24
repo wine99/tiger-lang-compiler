@@ -155,6 +155,9 @@ let aiwf s i =
   (B.add_insn (Some t, i), Ll.Id t)
 
 let biwf t i = (B.add_insn (Some t, i), Ll.Id t)
+
+let no_res_inst i = (B.add_insn (None, i), Ll.Null)
+
 (* --- monadic interface;) ----------------------------- *)
 
 (* Notes on the monadic interface:
@@ -262,7 +265,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
       let ty = ty_of_var var in
       let* e = cgE_ exp in
       let* dest = cgVar ~load:false ctxt var in
-      (B.add_insn (None, Ll.Store (ty_to_llty ty, e, dest)), Ll.Null)
+      no_res_inst @@ Ll.Store (ty_to_llty ty, e, dest)
   | H.LetExp {vardecl; body} -> (
     match vardecl with
     | VarDec {name; typ; init; _} ->
