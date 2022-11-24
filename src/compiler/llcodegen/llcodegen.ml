@@ -386,7 +386,11 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
   | H.BreakExp -> (
     match ctxt.break_lbl with
     | None -> raise NotImplemented (* Should not be allowed *)
-    | Some merge_lbl -> (B.term_block @@ Ll.Br merge_lbl, Ll.Null) )
+    | Some merge_lbl -> (
+      let dummy = fresh "dummy" in
+      let* _ = (B.term_block @@ Ll.Br merge_lbl, Ll.Null) in
+      (B.start_block dummy, Ll.Null)
+      ) )
   | RecordExp {fields= fields_inits} ->
       let rec cgFieldsInit rec_ptr rec_ptr_i8 fields_inits rec_ty fields_tys
           rec_llty =
