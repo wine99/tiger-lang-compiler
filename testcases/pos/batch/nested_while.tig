@@ -1,0 +1,13 @@
+let
+    var x : int := 10
+    var y : int := 10
+in
+    while x > 0 do (
+        while y > 0 do (
+            y := y - 1;
+            break
+        );
+        x := x - 1;
+        y := x
+    )
+end
