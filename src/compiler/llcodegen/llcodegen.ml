@@ -205,14 +205,14 @@ let global_functions =
   ; ("not", Ll.I64)
   ; ("tigerexit", Ll.Void) ]
 
-let cg_abi op left right =
+let cg_ai_ op left right =
   aiwf "arith_tmp" @@ Ll.Binop (op, Ll.I64, left, right)
 
-let cg_arith_binop_instr left right = function
-  | Oper.PlusOp -> cg_abi Ll.Add left right
-  | Oper.MinusOp -> cg_abi Ll.Sub left right
-  | Oper.TimesOp -> cg_abi Ll.Mul left right
-  | Oper.DivideOp -> cg_abi Ll.SDiv left right
+let cg_arith_instr left right = function
+  | Oper.PlusOp -> cg_ai_ Ll.Add left right
+  | Oper.MinusOp -> cg_ai_ Ll.Sub left right
+  | Oper.TimesOp -> cg_ai_ Ll.Mul left right
+  | Oper.DivideOp -> cg_ai_ Ll.SDiv left right
   | Oper.ExponentOp ->
       aiwf "ret"
         (Ll.Call
@@ -220,6 +220,28 @@ let cg_arith_binop_instr left right = function
            , Ll.Gid (S.symbol "exponent")
            , [(Ll.I64, left); (Ll.I64, right)] ) )
   | _ -> raise CodeGenerationBug
+
+let cg_cmp_instr ty left right op =
+  match ty with
+  | Ty.STRING ->
+      let cnd =
+        match op with
+        | Oper.EqOp -> "stringEqual"
+        | Oper.NeqOp -> "stringNotEq"
+        | Oper.LtOp -> "stringLess"
+        | Oper.LeOp -> "stringLessEq"
+        | Oper.GtOp -> "stringGreater"
+        | Oper.GeOp -> "stringGreaterEq"
+        | _ -> raise CodeGenerationBug
+      in
+      let func = Ll.Gid (S.symbol cnd) in
+      aiwf "ret" (Ll.Call (Ll.I64, func, [(ptr_i8, left); (ptr_i8, right)]))
+  | _ ->
+      let cnd = cmp_to_ll_cmp op in
+      let* tmp =
+        aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, left, right)
+      in
+      aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64)
 
 let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
     B.buildlet * Ll.operand (* Alternatively: Ll.operand m *) =
@@ -230,32 +252,12 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
     ->
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
-      cg_arith_binop_instr op_left op_right oper
-  | H.OpExp {left; right; oper; _} when List.exists (( = ) oper) cmp_oper
-    -> (
+      cg_arith_instr op_left op_right oper
+  | H.OpExp {left= H.Exp {ty; _} as left; right; oper; _}
+    when List.exists (( = ) oper) cmp_oper ->
       let* op_left = cgE_ left in
       let* op_right = cgE_ right in
-      match left with
-      | H.Exp {ty; _} when ty = Ty.STRING ->
-          let cnd =
-            match oper with
-            | EqOp -> "stringEqual"
-            | NeqOp -> "stringNotEq"
-            | LtOp -> "stringLess"
-            | LeOp -> "stringLessEq"
-            | GtOp -> "stringGreater"
-            | GeOp -> "stringGreaterEq"
-            | _ -> raise NotImplemented
-          in
-          let func = Ll.Gid (S.symbol cnd) in
-          aiwf "ret"
-            (Ll.Call (Ll.I64, func, [(ptr_i8, op_left); (ptr_i8, op_right)]))
-      | H.Exp {ty; _} ->
-          let cnd = cmp_to_ll_cmp oper in
-          let* tmp =
-            aiwf "cmp_tmp" @@ Ll.Icmp (cnd, ty_to_llty ty, op_left, op_right)
-          in
-          aiwf "cmp_tmp" @@ Ll.Zext (Ll.I1, tmp, Ll.I64) )
+      cg_cmp_instr ty op_left op_right oper
   | H.AssignExp {var; exp} ->
       let ty = ty_of_var var in
       let* e = cgE_ exp in
