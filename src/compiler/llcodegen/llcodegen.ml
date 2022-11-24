@@ -277,8 +277,7 @@ let rec cgExp ctxt (Exp {exp_base; ty; _} : H.exp) :
         let* _ = (build_store (ty_to_llty typ) e dest, Ll.Null) in
         cgE_ body )
   | H.SeqExp exps ->
-      let rec loop exps =
-        match exps with
+      let rec loop = function
         | [] -> (B.id_buildlet, Ll.Null)
         | [e] -> cgE_ e
         | e :: es ->
