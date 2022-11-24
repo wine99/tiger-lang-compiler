@@ -480,7 +480,8 @@ and cgVar ?(load = true) (ctxt : context) (H.Var {var_base; ty; _}) =
   | AccessVar (i, sym) ->
       let locals = Ll.Id ctxt.summary.locals_uid in
       let* var_ptr = cgVarLookup ctxt ctxt.summary locals sym i in
-      if load then mk_var_load_inst ctxt ty var_ptr else return var_ptr
+      if load then mk_var_load_inst ctxt return_llty var_ptr
+      else return var_ptr
   | FieldVar (var, sym) ->
       let rec_ty = ty_of_var var in
       let rec_llty = get_rec_or_arr_back ctxt.uenv @@ rec_ty in
@@ -551,8 +552,7 @@ and mk_var_load_inst ctxt ty var_ptr =
   let null_lbl = fresh "null_lbl" in
   let not_null_lbl = fresh "not_null_lbl" in
   let* cmp =
-    aiwf "var_cmp"
-    @@ Ll.Icmp (Ll.Eq, Ll.Ptr (ty_to_llty ty), Ll.Null, var_ptr)
+    aiwf "var_cmp" @@ Ll.Icmp (Ll.Eq, Ll.Ptr ty, Ll.Null, var_ptr)
   in
   let* _ = (B.term_block @@ Ll.Cbr (cmp, null_lbl, not_null_lbl), Ll.Null) in
   (* Null branch *)
@@ -571,7 +571,7 @@ and mk_var_load_inst ctxt ty var_ptr =
   in
   let* _ = (B.term_block @@ Ll.Br not_null_lbl, Ll.Null) in
   let* _ = (B.start_block @@ not_null_lbl, Ll.Null) in
-  aiwf "var" @@ Ll.Load (ty_to_llty ty, var_ptr)
+  aiwf "var" @@ Ll.Load (ty, var_ptr)
 
 (* Usage: pass locals to parent_ptr *)
 and cgVarLookup ctxt summary (parent_ptr : Ll.operand) sym n =
