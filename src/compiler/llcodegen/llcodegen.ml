@@ -492,7 +492,7 @@ and cgVar ?(load = true) (ctxt : context) (H.Var {var_base; ty; _}) =
       let* field_ptr =
         aiwf "field_ptr" @@ gep_0 rec_llty rec_ptr @@ field_offset sym rec_ty
       in
-      if load then aiwf "field" @@ Ll.Load (return_llty, field_ptr)
+      if load then mk_field_var_load_inst return_llty field_ptr
       else return field_ptr
   | SubscriptVar (var, exp) ->
       let inbound_lbl = fresh "inbound_lbl" in
@@ -549,6 +549,7 @@ and assoc_index a l =
   loop l 0
 
 and mk_var_load_inst ctxt ty var_ptr =
+  (* only do this for struct types otherwise we generate too many instructions *)
   let null_lbl = fresh "null_lbl" in
   let not_null_lbl = fresh "not_null_lbl" in
   let* cmp =
@@ -564,9 +565,6 @@ and mk_var_load_inst ctxt ty var_ptr =
   in
   let* _ =
     match ty with
-    | Ll.Struct _ ->
-        aiwf "rec_field_error_ret"
-        @@ Ll.Call (Ll.I64, Ll.Gid (S.symbol "recFieldError"), [])
     | _ ->
         no_res_inst
         @@ Ll.Call
@@ -578,6 +576,29 @@ and mk_var_load_inst ctxt ty var_ptr =
   (* Not-null branch *)
   let* _ = (B.start_block @@ not_null_lbl, Ll.Null) in
   aiwf "var" @@ Ll.Load (ty, var_ptr)
+
+and mk_field_var_load_inst ty field_ptr =
+  match ty with
+  | Ll.Struct _ ->
+      let null_lbl = fresh "null_lbl" in
+      let not_null_lbl = fresh "not_null_lbl" in
+      let* cmp =
+        aiwf "var_cmp" @@ Ll.Icmp (Ll.Eq, Ll.Ptr ty, Ll.Null, field_ptr)
+      in
+      let* _ =
+        (B.term_block @@ Ll.Cbr (cmp, null_lbl, not_null_lbl), Ll.Null)
+      in
+      (* Null branch *)
+      let* _ = (B.start_block @@ null_lbl, Ll.Null) in
+      let* _ =
+        aiwf "rec_field_error_ret"
+        @@ Ll.Call (Ll.I64, Ll.Gid (S.symbol "recFieldError"), [])
+      in
+      let* _ = (B.term_block @@ Ll.Br not_null_lbl, Ll.Null) in
+      (* Not-null branch *)
+      let* _ = (B.start_block @@ not_null_lbl, Ll.Null) in
+      aiwf "field" @@ Ll.Load (ty, field_ptr)
+  | _ -> aiwf "field" @@ Ll.Load (ty, field_ptr)
 
 (* Usage: pass locals to parent_ptr *)
 and cgVarLookup ctxt summary (parent_ptr : Ll.operand) sym n =
