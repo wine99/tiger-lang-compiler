@@ -199,20 +199,17 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
       in
       let f ctxt_acc (A.Fdecl {name; args; result; body; pos}) =
         let level = ctxt.level + 1 in
-        let old_locals = !(ctxt.locals_ref) in
-        ctxt.locals_ref := [] ;
         let venv =
           List.fold_left
             (fun acc (A.Arg {name= n; _}) -> S.enter (acc, n, level))
             mutual_rec_venv args
         in
-        let ctxt' = {ctxt with level; name; venv} in
+        let ctxt' = {ctxt with level; name; venv; locals_ref= ref []} in
         let parent_opt = Some ctxt.name in
-        ctxt.locals_ref := old_locals ;
         let args =
           List.map
             (fun (A.Arg {name= n; escape; ty; pos= p}) ->
-              ctxt.locals_ref := (n, ty) :: !(ctxt.locals_ref) ;
+              ctxt'.locals_ref := (n, ty) :: !(ctxt'.locals_ref) ;
               H.Arg {name= n; escape; ty; pos= p} )
             args
         in
@@ -225,7 +222,7 @@ and hoist_decl (ctxt : context) (d : A.decl) : context * H.vardecl option =
             ; body= h_body
             ; pos
             ; parent_opt
-            ; locals= !(ctxt.locals_ref) }
+            ; locals= !(ctxt'.locals_ref) }
         in
         emit_fdecl ctxt.writer hoisted_fdecl ;
         {ctxt_acc with venv}
